@@ -1,2 +1,5 @@
 *.vo
 *.v.d
+.coq-native/*
+*.glob
+*.aux
