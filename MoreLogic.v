@@ -21,7 +21,6 @@ Inductive ex (X:Type) (P : X->Prop) : Prop :=
 
 *)
 
-
 (** *** *)
 (** Coq's [Notation] facility can be used to introduce more
     familiar notation for writing existentially quantified
@@ -99,7 +98,8 @@ Qed.
 ]] 
     mean? *)
 
-(* FILL IN HERE *)
+(* There is at least one n whose successor is a beautiful number
+   More meaningfully, there is at least one beautiful number above 0 *)
 
 (*
 *)
@@ -109,8 +109,8 @@ Qed.
 
 Theorem dist_not_exists : forall (X:Type) (P : X -> Prop),
   (forall x, P x) -> ~ (exists x, ~ P x).
-Proof. 
-  (* FILL IN HERE *) Admitted.
+Proof. intros. intro. SearchAbout exist. inversion H0. apply H1. apply H. Qed.
+
 (** [] *)
 
 (** **** Exercise: 3 stars, optional (not_exists_dist) *)
@@ -121,8 +121,9 @@ Theorem not_exists_dist :
   excluded_middle ->
   forall (X:Type) (P : X -> Prop),
     ~ (exists x, ~ P x) -> (forall x, P x).
-Proof.
-  (* FILL IN HERE *) Admitted.
+Proof. intros. apply classic_ex_middle in H. unfold classic in H.
+       firstorder. apply H. unfold not in *. apply H0.
+Qed.       
 (** [] *)
 
 (** **** Exercise: 2 stars (dist_exists_or) *)
@@ -131,8 +132,13 @@ Proof.
 
 Theorem dist_exists_or : forall (X:Type) (P Q : X -> Prop),
   (exists x, P x \/ Q x) <-> (exists x, P x) \/ (exists x, Q x).
-Proof.
-   (* FILL IN HERE *) Admitted.
+Proof. split; intros.
+  Case "->". inversion H. inversion H0; [apply or_introl | apply or_intror]; 
+                          exists witness; exact H1.
+  Case "<-". destruct H; inversion H; exists witness.
+             apply or_introl. exact H0.
+             apply or_intror. exact H0.
+Qed.   
 (** [] *)
 
 (* ###################################################### *)
@@ -158,7 +164,8 @@ Inductive sumbool (A B : Prop) : Set :=
  | right : B -> sumbool A B.
 
 Notation "{ A } + { B }" :=  (sumbool A B) : type_scope.
-
+Arguments left {A} {B} a.
+Arguments right {A} {B} b.
 (** Think of [sumbool] as being like the [boolean] type, but instead
 of its values being just [true] and [false], they carry _evidence_
 of truth or falsity. This means that when we [destruct] them, we
@@ -233,18 +240,12 @@ Proof.
    use the auxiliary lemma [beq_nat_true] to convert a fact about booleans
    to a Prop. *)
 
-
 (** **** Exercise: 1 star (override_shadow') *)
 Theorem override_shadow' : forall (X:Type) x1 x2 k1 k2 (f : nat->X),
   (override' (override' f k1 x2) k1 x1) k2 = (override' f k1 x1) k2.
-Proof.
-  (* FILL IN HERE *) Admitted.
+Proof. intros. unfold override'. destruct (eq_nat_dec k1 k2); reflexivity. Qed.
+  
 (** [] *)
-
-
-
-
-
 
 (* ####################################################### *)
 (** * Additional Exercises *)
@@ -255,8 +256,12 @@ Proof.
     asserts that [P] is true for every element of the list [l]. *)
 
 Inductive all (X : Type) (P : X -> Prop) : list X -> Prop :=
-  (* FILL IN HERE *)
-.
+| allnil : all X P []
+| allcons : forall x xs, P x -> all X P xs -> all X P (x :: xs).
+
+Arguments all {X} P xs.
+Arguments allnil {X} {P}.
+Arguments allcons {X} {P} {x} {xs} px pxs.
 
 (** Recall the function [forallb], from the exercise
     [forall_exists_challenge] in chapter [Poly]: *)
@@ -274,7 +279,24 @@ Fixpoint forallb {X : Type} (test : X -> bool) (l : list X) : bool :=
     Are there any important properties of the function [forallb] which
     are not captured by your specification? *)
 
-(* FILL IN HERE *)
+
+Theorem forallb_all : forall X (pred : X -> Prop) 
+                        (test : forall x, {pred x} + {~ (pred x)})
+                        (l : list X),
+         {all pred l} + {~ (all pred l)}.
+Proof. intros. induction l as [|y ys]. 
+       Case "l = []". left. apply allnil.
+       Case "l = y :: ys". destruct IHys.
+         SCase "IHxs : all test ys". destruct (test y) eqn:ty.
+           SSCase "test y = true". left. apply allcons. exact p. exact a.
+           SSCase "test y = false". 
+             right. intro. inversion H. destruct n. exact H2.
+         SCase "IHxs : ~ all test ys". right. intro. inversion H.
+           apply n. apply H3.
+Defined.
+
+Arguments forallb_all {X} {pred} test l.
+Eval compute in forallb_all (eq_nat_dec 10) [10; 10; 10; 10].
 (** [] *)
 
 (** **** Exercise: 4 stars, advanced (filter_challenge) *)
@@ -302,7 +324,22 @@ Fixpoint forallb {X : Type} (test : X -> bool) (l : list X) : bool :=
     for one list to be a merge of two others.  Do this with an
     inductive relation, not a [Fixpoint].)  *)
 
-(* FILL IN HERE *)
+Theorem filter_spec : forall (t : nat -> bool) (l : list nat),
+        all (fun x => t x = true) (filter t l) /\ subseq (filter t l) l.
+Proof. split; intros. 
+       Case "p1". induction l as [|y ys]; simpl.
+         SCase "l = []". apply allnil.
+         SCase "l = y :: ys". destruct (t y) eqn:ty.
+           SSCase "t y = true". apply allcons. exact ty. apply IHys.
+           SSCase "t y = false". apply IHys.
+       Case "p2". induction l as [|y ys]; simpl.
+         SCase "l = []". apply sub_refl.
+         SCase "l = y :: ys". destruct (t y) eqn:ty.
+           SSCase "t y = true". apply sub_cons2. apply IHys.
+           SSCase "t y = false". apply sub_cons1. apply IHys.
+Qed.
+(* I'd generalize it, but subseq is specific to nats right now *)
+(* on pain of really weird inversions *)
 (** [] *)
 
 (** **** Exercise: 5 stars, advanced, optional (filter_challenge_2) *)
@@ -327,21 +364,42 @@ Inductive appears_in {X:Type} (a:X) : list X -> Prop :=
     Here's a pair of warm-ups about [appears_in].
 *)
 
+Lemma app_nil_r : forall X (xs : list X), xs ++ [] = xs.
+Proof. induction xs. reflexivity. simpl. rewrite IHxs. reflexivity. Qed.
+
 Lemma appears_in_app : forall (X:Type) (xs ys : list X) (x:X), 
      appears_in x (xs ++ ys) -> appears_in x xs \/ appears_in x ys.
-Proof.
-  (* FILL IN HERE *) Admitted.
+Proof. induction xs as [|x' xs']; intros; simpl in *. 
+       Case "xs = []". right. apply H.
+       Case "xs = x' :: xs'". inversion H; subst.
+         SCase "H : ai_here x (x :: xs ++ ys)". left. apply ai_here.
+         SCase "H : ai_later x' (xs ++ ys)". apply IHxs' in H1. destruct H1.
+           SSCase "H0 : right (appears_in x xs)". left. apply ai_later. apply H0.
+           SSCase "H0 : appears_in x ys". right. apply H0.
+Qed. 
 
 Lemma app_appears_in : forall (X:Type) (xs ys : list X) (x:X), 
      appears_in x xs \/ appears_in x ys -> appears_in x (xs ++ ys).
-Proof.
-  (* FILL IN HERE *) Admitted.
-
+Proof. induction xs as [|x' xs']; intros.
+       Case "xs = []". destruct H.
+         SCase "H : appears_in x []". inversion H.
+         SCase "H : appears_in x ys". apply H.
+       Case "xs = x' :: xs'". destruct H; simpl.
+         SCase "H : appears_in x (x' :: xs')". inversion H; subst.
+           SSCase "H : appears_in x' (x' :: xs')". apply ai_here.
+           SSCase "H : ai_later x' (appears_in x xs')".
+             simpl. apply ai_later. apply IHxs'. left. apply H1.
+         SCase "H : appears_in x ys". 
+           apply ai_later. apply IHxs'. right. apply H.
+Qed.
 (** Now use [appears_in] to define a proposition [disjoint X l1 l2],
     which should be provable exactly when [l1] and [l2] are
     lists (with elements of type X) that have no elements in common. *)
 
-(* FILL IN HERE *)
+Definition disjoint : forall X, list X -> list X -> Prop := fun X xs ys =>
+  all (fun x => ~ (appears_in x ys)) xs \/ all (fun y => ~ (appears_in y xs)) ys.
+
+Arguments disjoint {X} xs ys.
 
 (** Next, use [appears_in] to define an inductive proposition
     [no_repeats X l], which should be provable exactly when [l] is a
@@ -350,12 +408,67 @@ Proof.
     [no_repeats bool []] should be provable, while [no_repeats nat
     [1,2,1]] and [no_repeats bool [true,true]] should not be.  *)
 
-(* FILL IN HERE *)
-
 (** Finally, state and prove one or more interesting theorems relating
     [disjoint], [no_repeats] and [++] (list append).  *)
 
-(* FILL IN HERE *)
+Inductive no_repeats (X : Type) : list X -> Prop :=
+| norepnil : no_repeats X []
+| norepcons : forall (x : X) (xs : list X),
+              no_repeats X xs -> ~ (appears_in x xs) -> 
+              no_repeats X (x :: xs).
+
+Arguments no_repeats {X} xs.
+Arguments norepcons {X} {x} {xs} p1 p2.
+Arguments norepnil {X}.
+
+Definition Decideable1 {X : Type} (P : X -> Prop) : Type :=
+  forall x,  {P x} + {~ (P x)}.
+
+Definition Decideable2 {X Y : Type} (P : X -> Y -> Prop) : Type :=
+  forall x y,  {P x y} + {~ (P x y)}.
+
+Theorem appears_in_proc : forall X (f : forall (x y : X), {x = y} + {x <> y})
+                            (x : X) (l : list X),
+                            {appears_in x l} + {~ appears_in x l}.
+Proof. intros. induction l as [|y ys].
+       Case "l = []". right. intro. inversion H.
+       Case "l = x' :: xs". destruct IHys as [IHys|IHys].
+         SCase "IHys : appears_in x ys". left. apply ai_later. apply IHys.
+         SCase "IHys : ~ appears_in x ys". destruct (f x y).
+           SSCase "x = y". left. rewrite e. apply ai_here.
+           SSCase "x <> y". right. intro. inversion H; contradiction.
+Defined.
+
+Arguments appears_in_proc {X} f x l.
+
+Theorem dup_no_repeats : forall X (x : X) (l : list X), ~ (no_repeats (x :: x :: l)).
+Proof. intros. intro. inversion H. apply H3. apply ai_here. Qed.
+
+Theorem no_repeats_proc : forall X (f : forall (x y : X), {x = y} + {x <> y}),
+                            Decideable1 (@no_repeats X).
+Proof. unfold Decideable1. intros X f l. induction l as [|x xs].
+       Case "l = []". left. apply norepnil.
+       Case "l = x :: xs". destruct xs as [|y ys].
+         SCase "xs = []". 
+           left. apply norepcons. apply norepnil. intro. inversion H; subst.
+         SCase "xs = y :: ys". destruct IHxs as [IHxs | IHxs].
+           SSCase "IHxs : no_repeats (y :: ys)". destruct (f x y).
+             SSSCase "x = y". right. rewrite e. apply dup_no_repeats.
+             SSSCase "x <> y". destruct (appears_in_proc f x ys).
+               SSSSCase "appears_in x ys". right. intro. inversion H; subst.
+                 apply H3. apply ai_later. apply a.
+               SSSSCase "~ appears_in x ys". left.
+                 apply norepcons. apply IHxs. intro. inversion H. contradiction n.
+                 apply n0. apply H1.
+           SSCase "IHxs : ~ no_repeats (y :: ys)". right. intro. destruct (f x y).
+             SSSCase "x = y". inversion H; subst. apply H3. apply ai_here.
+             SSSCase "x <> y". inversion H; subst. destruct (appears_in_proc f x ys).
+               apply H3. apply ai_later. apply a.
+               apply IHxs. apply H2.
+Defined. 
+
+Arguments no_repeats_proc {X} f x.
+
 (** [] *)
 
 
@@ -373,9 +486,10 @@ Proof.
     does not stutter.) *)
 
 Inductive nostutter:  list nat -> Prop :=
- (* FILL IN HERE *)
-.
+| nostutnil : nostutter []
+| nostutcons : forall n xs, Some n <> hd_opt xs -> nostutter xs -> nostutter (n :: xs).
 
+Arguments nostutcons {n} {xs} p1 p2.
 (** Make sure each of these tests succeeds, but you are free
     to change the proof if the given one doesn't work for you.
     Your definition might be different from mine and still correct,
@@ -389,25 +503,31 @@ Inductive nostutter:  list nat -> Prop :=
     tactics.  *)
 
 Example test_nostutter_1:      nostutter [3;1;4;1;5;6].
-(* FILL IN HERE *) Admitted.
+Proof. repeat constructor; simplify_eq. Qed.
 (* 
   Proof. repeat constructor; apply beq_nat_false; auto. Qed.
 *)
 
 Example test_nostutter_2:  nostutter [].
-(* FILL IN HERE *) Admitted.
+Proof. repeat constructor; simplify_eq. Qed.
 (* 
   Proof. repeat constructor; apply beq_nat_false; auto. Qed.
 *)
 
 Example test_nostutter_3:  nostutter [5].
-(* FILL IN HERE *) Admitted.
+Proof. repeat constructor; simplify_eq. Qed.
 (* 
   Proof. repeat constructor; apply beq_nat_false; auto. Qed.
 *)
 
 Example test_nostutter_4:      not (nostutter [3;1;1;4]).
-(* FILL IN HERE *) Admitted.
+Proof. intro.
+       repeat match goal with 
+         h: nostutter _ |- _ => inversion h; clear h; subst 
+       end.
+       contradiction H1; auto. 
+Qed.
+
 (* 
   Proof. intro.
   repeat match goal with 
@@ -429,22 +549,27 @@ Example test_nostutter_4:      not (nostutter [3;1;1;4]).
 
 Lemma app_length : forall (X:Type) (l1 l2 : list X),
   length (l1 ++ l2) = length l1 + length l2. 
-Proof. 
-  (* FILL IN HERE *) Admitted.
+Proof. induction l1; simpl in *; intros.
+       reflexivity. rewrite IHl1. reflexivity.
+Qed.
 
 Lemma appears_in_app_split : forall (X:Type) (x:X) (l:list X),
   appears_in x l -> 
   exists l1, exists l2, l = l1 ++ (x::l2).
-Proof.
-  (* FILL IN HERE *) Admitted.
+Proof. intros X x l; generalize dependent x; induction l as [|y ys]; 
+       intros; inversion H; subst.
+       exists []. exists ys. reflexivity.
+       apply IHys in H1. inversion H1. inversion H0.
+       exists (y :: witness). exists witness0. simpl. rewrite H2. reflexivity.
+Qed.
 
 (** Now define a predicate [repeats] (analogous to [no_repeats] in the
    exercise above), such that [repeats X l] asserts that [l] contains
    at least one repeated element (of type [X]).  *)
 
 Inductive repeats {X:Type} : list X -> Prop :=
-  (* FILL IN HERE *)
-.
+| rephere : forall x xs, appears_in x xs -> repeats (x :: xs)
+| replater : forall x xs, repeats xs -> repeats (x :: xs).
 
 (** Now here's a way to formalize the pigeonhole principle. List [l2]
     represents a list of pigeonhole labels, and list [l1] represents
@@ -457,17 +582,56 @@ Inductive repeats {X:Type} : list X -> Prop :=
     [appears_in] is decidable; if you can manage to do this, you will
     not need the [excluded_middle] hypothesis. *)
 
-Theorem pigeonhole_principle: forall (X:Type) (l1  l2:list X), 
-   excluded_middle -> 
-   (forall x, appears_in x l1 -> appears_in x l2) -> 
-   length l2 < length l1 -> 
-   repeats l1.  
-Proof.
-   intros X l1. induction l1 as [|x l1'].
-  (* FILL IN HERE *) Admitted.
+Lemma len0_nil {X : Type} : forall (l : list X), length l = 0 <-> l = [].
+Proof. split; intros; destruct l; inversion H; firstorder. Qed.
+
+Definition dec_eq (X : Type) : Type := forall x y : X, {x = y} + {x <> y}.
+
+Lemma apr_uncons : forall X (a b : X) l, appears_in a (b :: l) ->
+                                    a <> b -> appears_in a l.
+Proof. intros. induction l; inversion H; subst.
+       contradiction H0. contradiction H0. reflexivity. inversion H2.
+       apply ai_later. apply IHl. apply ai_here. apply H2.
+Qed.
+Lemma appear_remove_redundant : forall X (a b : X) l1 l2,
+                                  dec_eq X -> 
+                                  a <> b ->
+                                  appears_in a (l1 ++ b :: l2) ->
+                                  appears_in a (l1 ++ l2).
+Proof. induction l1; intros; simpl in *.
+       apply apr_uncons in H0. apply H0. apply H.
+       destruct (X0 a x); subst. apply ai_here.
+       apply ai_later. apply IHl1. apply X0. apply H.
+       apply apr_uncons with (b := x). apply H0. apply n.
+Qed.
+
+Theorem Pigeonhole_Principle: forall (X : Type) (l1 l2 : list X)
+                              (f : dec_eq X),
+        (forall x, appears_in x l1 -> appears_in x l2) -> 
+        length l2 < length l1 -> 
+        repeats l1.  
+Proof. unfold excluded_middle, lt, dec_eq. 
+       induction l1 as [|y ys].
+       Case "l1 = []". intros l2 f H Hlen. inversion Hlen.
+       Case "l1 = y :: ys". intros l2 f H Hlen.
+         assert (Decideable2 (@appears_in X)). unfold Decideable2.
+           apply appears_in_proc. apply f.
+         unfold Decideable2 in *.
+         destruct (X0 y ys).
+           apply rephere. apply a.
+           apply replater. assert (Hl2: exists pre, exists post, l2 = pre ++ y :: post).
+             apply appears_in_app_split. apply H. apply ai_here.
+             inversion Hl2. inversion H0.
+             apply (IHys (witness ++ witness0)).
+               apply f. intros. destruct (f x y).
+               apply ex_falso_quodlibet. apply n. subst. apply H2.
+               subst. firstorder. clear H1. 
+               apply appear_remove_redundant with (b := y).
+                 unfold dec_eq. apply f. 
+                 apply n0. apply H. apply ai_later. apply H2. 
+                 rewrite <- app_length_cons with (x := y); subst.
+                 inversion Hlen; firstorder; subst.
+Qed.
 (** [] *)
-
-(* FILL IN HERE *)
-
 
 (* $Date: 2014-02-22 09:43:41 -0500 (Sat, 22 Feb 2014) $ *)
