@@ -93,7 +93,7 @@ Print eight_is_beautiful.
 (** In view of this, we might wonder whether we can write such
     an expression ourselves. Indeed, we can: *)
 
-Check (b_sum 3 5 b_3 b_5).  
+Check (b_sum 3 5 b_3 b_5).
 (* ===> beautiful (3 + 5) *)
 
 (** The expression [b_sum 3 5 b_3 b_5] can be thought of as
@@ -186,10 +186,11 @@ Print eight_is_beautiful'''.
 Theorem six_is_beautiful :
   beautiful 6.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  apply b_sum with (n := 3).
+  apply b_3. apply b_3.
+Qed.
 
-Definition six_is_beautiful' : beautiful 6 :=
-  (* FILL IN HERE *) admit.
+Definition six_is_beautiful' : beautiful 6 := b_sum 3 3 b_3 b_3.
 (** [] *)
 
 (** **** Exercise: 1 star (nine_is_beautiful) *)
@@ -197,11 +198,9 @@ Definition six_is_beautiful' : beautiful 6 :=
 
 Theorem nine_is_beautiful :
   beautiful 9.
-Proof.
-  (* FILL IN HERE *) Admitted.
+Proof. apply b_sum with (n := 6). apply six_is_beautiful. apply b_3. Qed.
 
-Definition nine_is_beautiful' : beautiful 9 :=
-  (* FILL IN HERE *) admit.
+Definition nine_is_beautiful' : beautiful 9 := b_sum 6 3 six_is_beautiful b_3.
 (** [] *)
 
 (* ##################################################### *)
@@ -286,26 +285,27 @@ Definition beatiful_plus3'' : Prop :=
 (** In general, "[P -> Q]" is just syntactic sugar for
     "[forall (_:P), Q]". *)
 
-
 (** **** Exercise: 2 stars b_times2 *)
 
 (** Give a proof object corresponding to the theorem [b_times2] from Prop.v *)
+SearchAbout beautiful.
+Print b_times2. SearchAbout mult.
+Theorem times2_plus : forall n, n + n = 2 * n. 
+Proof. intros. simpl. rewrite plus_0_r. reflexivity. Qed.
+Theorem b_plus_to_b_times2 : forall n, beautiful (n + n) -> beautiful (2 * n).
+Proof. intros. rewrite <- times2_plus. apply H. Qed.
 
-Definition b_times2': forall n, beautiful n -> beautiful (2*n) :=
-  (* FILL IN HERE *) admit.
+Definition b_times2': forall n, beautiful n -> beautiful (2*n) := fun n H => 
+    eq_ind (n + n) beautiful (b_sum n n H H) (2 * n) (times2_plus n).
+
 (** [] *)
-
-
 
 (** **** Exercise: 2 stars, optional (gorgeous_plus13_po) *) 
 (** Give a proof object corresponding to the theorem [gorgeous_plus13] from Prop.v *)
 
-Definition gorgeous_plus13_po: forall n, gorgeous n -> gorgeous (13+n):=
-   (* FILL IN HERE *) admit.
+Definition gorgeous_plus13_po: forall n, gorgeous n -> gorgeous (13+n):= fun n H =>
+  g_plus5 (8 + n) (g_plus5 (3 + n) (g_plus3 n H)).
 (** [] *)
-
-
-
 
 (** It is particularly revealing to look at proof objects involving the 
 logical connectives that we defined with inductive propositions in Logic.v. *)
@@ -314,7 +314,7 @@ Theorem and_example :
   (beautiful 0) /\ (beautiful 3).
 Proof.
   apply conj.
-   (* Case "left". *)  apply b_0.
+   (* Case "left". *)   apply b_0.
    (* Case "right". *)  apply b_3.  Qed.
 
 (** Let's take a look at the proof object for the above theorem. *)
@@ -377,8 +377,9 @@ we get: *)
 (** **** Exercise: 2 stars, optional (conj_fact) *)
 (** Construct a proof object demonstrating the following proposition. *)
 
-Definition conj_fact : forall P Q R, P /\ Q -> Q /\ R -> P /\ R :=
-  (* FILL IN HERE *) admit.
+Definition conj_fact : forall P Q R, P /\ Q -> Q /\ R -> P /\ R := fun P Q R P1 P2 => 
+  match P1, P2 with | (conj _ _ Pe _) , (conj _ _ _ Re) => conj P R Pe Re end.
+
 (** [] *)
 
 
@@ -391,9 +392,11 @@ Definition conj_fact : forall P Q R, P /\ Q -> Q /\ R -> P /\ R :=
     using tactics. (_Hint_: if you make use of previously defined
     theorems, you should only need a single line!) *)
 
+SearchAbout beautiful.
 Definition beautiful_iff_gorgeous :
   forall n, beautiful n <-> gorgeous n :=
-  (* FILL IN HERE *) admit.
+  fun n => conj (beautiful n -> gorgeous n) (gorgeous n -> beautiful n)
+                (beautiful__gorgeous n)       (gorgeous__beautiful n).
 (** [] *)
 
 
@@ -401,7 +404,11 @@ Definition beautiful_iff_gorgeous :
 (** Try to write down an explicit proof object for [or_commut] (without
     using [Print] to peek at the ones we already defined!). *)
 
-(* FILL IN HERE *)
+Definition or_commut'' : forall P Q, P \/ Q -> Q \/ P := fun P Q p =>
+  match p with
+    | or_introl _ _ Pe => or_intror Q P Pe
+    | or_intror _ _ Qe => or_introl Q P Qe
+  end.
 (** [] *)
 
 (** Recall that we model an existential for a property as a pair consisting of 
@@ -426,10 +433,8 @@ Definition snie : some_nat_is_even :=
 (** Complete the definition of the following proof object: *)
 
 Definition p : ex _ (fun n => beautiful (S n)) :=
-(* FILL IN HERE *) admit.
+  ex_intro _ (fun n => beautiful (S n)) 5 (b_sum 3 3 b_3 b_3).
 (** [] *)
-
-
 
 (* ##################################################### *)
 (** * Giving Explicit Arguments to Lemmas and Hypotheses *)
@@ -485,7 +490,6 @@ Proof.
   rewrite plus_comm with (n := b). 
   reflexivity. Qed.
 
-
 (** **** Exercise: 2 stars (trans_eq_example_redux) *)
 (** Redo the proof of the following theorem (from MoreCoq.v) using
 an [apply] of [trans_eq] but _not_ using a [with] clause. *)
@@ -494,10 +498,8 @@ Example trans_eq_example' : forall (a b c d e f : nat),
      [a;b] = [c;d] ->
      [c;d] = [e;f] ->
      [a;b] = [e;f].
-Proof.
-  (* FILL IN HERE *) Admitted.
+Proof. intros. apply (trans_eq _ [a;b] [c;d]). apply H. apply H0. Qed.
 (** [] *)
-
 
 
 (* ##################################################### *)
