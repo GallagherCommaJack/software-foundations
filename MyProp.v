@@ -604,11 +604,187 @@ Proof. induction l1; intros. destruct l2; [reflexivity | inversion H].
        apply IHl1 in H2. rewrite H2. reflexivity.
 Qed.
 
+Fixpoint init_and_last {X : Type} (l : list X) : option (list X * X) :=
+  match l with
+    | [] => None
+    | x :: xs => match init_and_last xs with
+                  | None => Some ([], x)
+                  | Some (xs', x') => Some (x :: xs', x')
+                end
+  end.
+
+Theorem init_and_last_inder : forall X xs ys (x y : X),
+                                init_and_last xs = Some (ys, y) <->
+                                init_and_last (x :: xs) = Some (x :: ys, y).
+Proof. split. 
+       Case "->". induction xs; intros. inversion H.
+         replace (snoc (x0 :: xs) y) with (x0 :: snoc xs y) in *.
+         simpl. destruct xs; inversion H; subst. reflexivity.
+         simpl in *. rewrite H1. reflexivity. reflexivity.
+       Case "<-". generalize dependent ys. induction xs; intros.
+         inversion H. simpl in *. destruct (init_and_last xs).
+         destruct p. inversion H. subst. reflexivity.
+         inversion H. subst. reflexivity.
+Qed.
+
+Definition uncons {X : Type} xs ys (x : X) : xs = ys -> x :: xs = x :: ys :=
+  f_equal (list X) (list X) (cons x) xs ys.
+
+Theorem init_and_list : forall X xs ys (y : X), init_and_last xs = Some (ys, y) <->
+                                           xs = snoc ys y.
+Proof. split.
+       Case "->". generalize dependent ys. induction xs; intros; inversion H.
+       destruct (init_and_last xs) eqn:i. destruct p. destruct ys as [|y' ys'];
+                                                      inversion H1; subst.
+         simpl. apply uncons. apply IHxs. reflexivity.
+         destruct xs. inversion H1; subst. reflexivity.
+         inversion i. destruct (init_and_last xs); [destruct p| ]; inversion H2.
+       Case "<-". generalize dependent xs. induction ys; intros.
+         destruct xs; inversion H; reflexivity.
+         destruct xs; inversion H; subst.
+         apply init_and_last_inder. apply IHys. reflexivity.
+Qed.
+
+(*
+Definition deq_induction : 
+  forall X (P : list X -> Prop),
+    P [] ->
+    (forall x, P [x]) ->
+    (forall x xs y, P (x :: snoc xs y) -> P xs) ->
+    (forall x xs y, P xs -> P (x :: snoc xs y)) ->
+    forall l : list X, P l :=
+  fun X P Pi Psi Psnoc =>
+    fix f (l : list X) := 
+  match l with
+    | [] => eq_ind [] P Pi l _
+    | [x] => eq_ind [x] P (Psi x) l _
+    | x :: xs => 
+      match init_and_last xs with
+        | Some (xs', y) => 
+          eq_ind (x :: snoc xs' y) P (Psnoc x xs' y (f xs')) l _
+        | None => eq_ind [x] P (Psi x) l _
+      end
+  end.
+*)
+
+Inductive deq (X : Type) : Type :=
+| dnil : deq X
+| dsi : X -> deq X
+| dcons : X -> deq X -> X -> deq X.
+
+Arguments dnil {X}.
+Arguments dsi {X} x.
+Arguments dcons {X} f m l.
+
+Fixpoint drev {X : Type} (d : deq X) : deq X := 
+  match d with
+    | dnil => dnil
+    | dsi x => dsi x
+    | dcons f m l => dcons l (drev m) f
+  end.
+
+Fixpoint dsize {X : Type} (d : deq X) : nat :=
+  match d with
+    | dnil => O
+    | dsi _ => 1
+    | dcons _ m _ => S (S (dsize m))
+  end.
+
+Fixpoint dfcons {X : Type} (x : X) (d : deq X) : deq X :=
+  match d with
+    | dnil => dsi x
+    | dsi y => dcons x dnil y
+    | dcons x' d' y => dcons x (dfcons x' d') y
+  end.
+
+Fixpoint to_d {X : Type} (l : list X) : deq X := 
+  match l with
+    | x :: xs => dfcons x (to_d xs)
+    | [] => dnil
+  end.
+
+Fixpoint from_d {X : Type} (d : deq X) : list X :=
+  match d with
+    | dnil => []
+    | dsi x => [x]
+    | dcons x d' y => x :: snoc (from_d d') y
+  end.
+
+Theorem dcons_comm_from : forall X d (x : X), from_d (dfcons x d) = x :: from_d d.
+Proof. induction d; intros. reflexivity. reflexivity.
+       simpl. rewrite IHd. reflexivity. Qed.
+
+Theorem to_from_d_id : forall X (l : list X), from_d (to_d l) = l.
+Proof. intros. induction l. reflexivity.
+       simpl. destruct (to_d l); simpl in *. subst. reflexivity.
+       subst. reflexivity. inversion IHl. rewrite dcons_comm_from in *. 
+       reflexivity. Qed.
+
+Inductive dpal {X : Type} : deq X -> Prop :=
+| dpnil : dpal dnil
+| dpsi : forall x, dpal (dsi x)
+| dpcons : forall x d, dpal d -> dpal (dcons x d x).
+
+Theorem rev_dpal : forall X (d : deq X), dpal d <-> drev d = d.
+Proof. split; intros.
+       Case "->". induction H; auto. simpl. rewrite IHdpal. reflexivity.
+       Case "<-". induction d. apply dpnil. apply dpsi.
+         inversion H. rewrite H1 in *. apply dpcons. rewrite H2.
+         apply IHd. apply H2.
+Qed.
+
+Theorem dcons_snoc_elim : forall X l (x y : X), to_d (x :: snoc l y) = dcons x (to_d l) y.
+Proof. induction l; intros. reflexivity.
+       simpl in *. rewrite IHl. reflexivity.
+Qed.
+
+Theorem dfcons_neq_dnil : forall X d (x : X), dfcons x d <> dnil.
+Proof. intros; destruct d; simplify_eq. Qed.
+
+Theorem dsize_neq : forall X (d1 d2 : deq X), dsize d1 <> dsize d2 -> d1 <> d2.
+Proof. destruct d1; intros; intro; apply H; rewrite H0; reflexivity. Qed.
+
+Theorem dfcons_suc : forall X d (x : X), dsize (dfcons x d) = S (dsize d).
+Proof. induction d; intros; [reflexivity|reflexivity|simpl]. 
+       rewrite IHd. reflexivity. Qed.
+
+Theorem to_d_nil : forall X (l : list X), to_d l = dnil -> l = [].
+Proof. intros. destruct l. reflexivity. apply ex_falso_quodlibet.
+       apply (dfcons_neq_dnil _ (to_d l) x). inversion H. reflexivity.
+Qed.
+
+Theorem to_d_si : forall X l (x : X), to_d l = dsi x -> l = [x].
+Proof. destruct l; intros; inversion H. destruct (to_d l) eqn:Heqel;
+       inversion H1; subst. apply to_d_nil in Heqel. rewrite Heqel. reflexivity.
+Qed.
+
+Theorem to_d_dcons : forall X d l (x y : X), 
+        to_d l = dcons x d y -> l = x :: snoc (from_d d) y.
+Proof. admit. Qed.
+
+Theorem paldub : forall X (x : X), pal [x;x].
+Proof. intros. replace [x; x] with (x :: snoc [] x); auto. 
+       apply palcons. apply palnil. Qed.
+
+Theorem paltrip : forall X (x y : X), pal [x; y; x].
+Proof. intros. replace [x;y;x] with (x :: snoc [y] x); auto.
+       apply palcons. apply palsing. Qed.
+
+Fixpoint rev_pal {X : Type} (l : list X) (H : l = rev l) : pal l.
+Proof. rewrite H. induction l as [|x xs]; simpl; [exact palnil | ].
+       destruct (rev xs) eqn:rxs.
+       subst. simpl. apply palsing.
+       inversion H. rewrite rxs in H1. inversion H1. subst.
+       rewrite rev_snoc_elim in rxs. inversion rxs. simpl.
+       apply palcons. apply rev_pal. rewrite rev_involutive.
+       apply H2.
+Qed.       
+
 Theorem rev_pal : forall X (l : list X), l = rev l -> pal l.
 Proof. intros. 
        rewrite H.
        induction l as [| x xs]; simpl; [exact palnil | ].
-       simpl in *. destruct (rev xs).
+       simpl in *. destruct (rev xs) eqn:rxs.
        simpl. apply palsing.
        inversion H. subst. simpl. apply palcons. (* now what? *)
  Abort.
