@@ -1,6 +1,6 @@
 (** * MoreInd: More on Induction *)
 
-Require Export "ProofObjects".
+Require Export ProofObjects.
 
 (* ##################################################### *)
 (** * Induction Principles *)
@@ -38,7 +38,6 @@ Proof.
   Case "S". simpl. intros n IHn. rewrite -> IHn. 
     reflexivity.  Qed.
 
-
 (** This proof is basically the same as the earlier one, but a
     few minor differences are worth noting.  First, in the induction
     step of the proof (the ["S"] case), we have to do a little
@@ -72,8 +71,10 @@ Proof.
 
 Theorem plus_one_r' : forall n:nat, 
   n + 1 = S n.
-Proof.
-  (* FILL IN HERE *) Admitted.
+Proof. apply nat_ind; intros.
+       reflexivity.
+       simpl. apply (f_equal nat nat S). apply H.
+Qed.
 (** [] *)
 
 (** Coq generates induction principles for every datatype defined with
@@ -117,6 +118,7 @@ Inductive rgb : Type :=
   | red : rgb
   | green : rgb
   | blue : rgb.
+(* rgb_ind : forall P : rgb → Prop, P red → P green → P blue → forall y : rgb, P y *)
 Check rgb_ind.
 (** [] *)
 
@@ -127,6 +129,8 @@ Inductive natlist : Type :=
   | nnil : natlist
   | ncons : nat -> natlist -> natlist.
 
+(* natlist_ind : forall P : natlist → Prop, P nnil → (forall x xs, P xs → P (ncons x xs)) →
+   forall xs, P xs *)
 Check natlist_ind.
 (* ===> (modulo a little variable renaming for clarity)
    natlist_ind :
@@ -144,6 +148,8 @@ Inductive natlist1 : Type :=
   | nsnoc1 : natlist1 -> nat -> natlist1.
 
 (** Now what will the induction principle look like? *)
+(* forall P : natlist1 → Prop, P nnil1 → (forall xs x → P xs → P (nsnoc1 xs x)) → forall xs, P xs *)
+Print natlist1_ind.
 (** [] *)
 
 (** From these examples, we can extract this general rule:
@@ -161,8 +167,6 @@ Inductive natlist1 : Type :=
 
 *)
 
-
-
 (** **** Exercise: 1 star, optional (byntree_ind) *)
 (** Write out the induction principle that Coq will generate for the
     following datatype.  Write down your answer on paper or type it
@@ -172,8 +176,10 @@ Inductive byntree : Type :=
  | bempty : byntree  
  | bleaf  : yesno -> byntree
  | nbranch : yesno -> byntree -> byntree -> byntree.
-(** [] *)
 
+(* byntree_ind : forall P : byntree -> Prop, P bempty -> (forall y, P bleaf) -> 
+   (forall y l r, P l -> P r -> P (nbranch y l r)) -> forall t, P t *)
+(** [] *)
 
 (** **** Exercise: 1 star, optional (ex_set) *)
 (** Here is an induction principle for an inductively defined
@@ -186,8 +192,15 @@ Inductive byntree : Type :=
     Give an [Inductive] definition of [ExSet]: *)
 
 Inductive ExSet : Type :=
-  (* FILL IN HERE *)
-.
+| con1 : bool -> ExSet
+| con2 : nat -> ExSet -> ExSet.
+
+Theorem ExSet_ind' :
+  forall P : ExSet -> Prop,
+    (forall b : bool, P (con1 b)) ->
+    (forall (n : nat) (e : ExSet), P e -> P (con2 n e)) ->
+    forall e : ExSet, P e.
+Proof. intros. induction e. apply H. apply H0. apply IHe. Qed.
 (** [] *)
 
 (** What about polymorphic datatypes?
@@ -221,7 +234,15 @@ Inductive ExSet : Type :=
 Inductive tree (X:Type) : Type :=
   | leaf : X -> tree X
   | node : tree X -> tree X -> tree X.
-Check tree_ind.
+Arguments leaf {X} v.
+Arguments node {X} l r.
+
+Theorem tree_ind' : forall X (P : tree X -> Prop),
+                      (forall x, P (leaf x)) ->
+                      (forall l r, P l -> P r -> P (node l r)) ->
+                      (forall t, P t).
+Proof. intros. induction t. apply H. apply H0. apply IHt1. apply IHt2. Qed.
+
 (** [] *)
 
 (** **** Exercise: 1 star, optional (mytype) *)
@@ -235,6 +256,20 @@ Check tree_ind.
                forall n : nat, P (constr3 X m n)) ->
             forall m : mytype X, P m                   
 *) 
+Inductive mytype (X : Type) : Type :=
+| constr1 : X -> mytype X
+| constr2 : nat -> mytype X
+| constr3 : mytype X -> nat -> mytype X.
+
+Theorem mytype_ind' :
+  forall (X : Type) (P : mytype X -> Prop),
+    (forall x : X, P (constr1 X x)) ->
+    (forall n : nat, P (constr2 X n)) ->
+    (forall m : mytype X, P m -> 
+                     forall n : nat, P (constr3 X m n)) ->
+    forall m : mytype X, P m.
+Proof. intros. induction m. apply H. apply H0. apply H1. apply IHm. Qed.
+
 (** [] *)
 
 (** **** Exercise: 1 star, optional (foo) *)
@@ -257,17 +292,17 @@ Inductive foo' (X:Type) : Type :=
   | C1 : list X -> foo' X -> foo' X
   | C2 : foo' X.
 
-(** What induction principle will Coq generate for [foo']?  Fill
+(* What induction principle will Coq generate for [foo']?  Fill
    in the blanks, then check your answer with Coq.)
      foo'_ind :
         forall (X : Type) (P : foo' X -> Prop),
               (forall (l : list X) (f : foo' X),
-                    _______________________ -> 
-                    _______________________   ) ->
+                    (P f -> P (C1 l f))) -> 
+                    P C2 ->
              ___________________________________________ ->
-             forall f : foo' X, ________________________
-*)
+             forall f : foo' X, P f
 
+*)
 (** [] *)
 
 (* ##################################################### *)
@@ -410,7 +445,6 @@ Proof.
 (* FILL IN HERE *)
 (** [] *)
 
-
 (** ** Generalizing Inductions. *)
 
 (** One potentially confusing feature of the [induction] tactic is
@@ -475,9 +509,11 @@ Proof.
   intros H.  
   remember 1 as n eqn:E. 
   (* now carry on as above *)
-  induction H.   
-Admitted.
-
+  induction H; inversion E. destruct n; simpl in *.
+  apply IHbeautiful2. apply H2.
+  destruct m; simpl in *. rewrite plus_0_r in H2. apply IHbeautiful1. apply H2.
+  rewrite <- plus_n_Sm in *. inversion H2.
+Qed.
 
 (* ####################################################### *)
 (** * Informal Proofs (Advanced) *)
@@ -634,8 +670,6 @@ Admitted.
 
              But then, by [le_S], [n <= S o'].  [] *)
 
-
-
 (* ##################################################### *)
 (** * Optional Material *)
 
@@ -646,7 +680,6 @@ Admitted.
     recommend skimming rather than skipping over it outright: it
     answers some questions that occur to many Coq users at some point,
     so it is useful to have a rough idea of what's here.) *)
-
 
 (* ##################################################### *)
 (** ** Induction Principles in [Prop] *)
@@ -831,10 +864,10 @@ Check le_ind.
    generated by Coq. 
    foo_ind
         : forall (X Y : Set) (P : foo X Y -> Prop),   
-          (forall x : X, __________________________________) ->
-          (forall y : Y, __________________________________) ->
-          (________________________________________________) ->
-           ________________________________________________
+          (forall x : X, P (foo1 x)) ->
+          (forall y : Y, P (foo2 y)) ->
+          (forall f : foo X Y, P f -> P (foo3 f)) ->
+           forall f, P f
 
 *)
 (** [] *)
@@ -849,9 +882,9 @@ Check le_ind.
           forall b : bar, P b
    Write out the corresponding inductive set definition.
    Inductive bar : Set :=
-     | bar1 : ________________________________________
-     | bar2 : ________________________________________
-     | bar3 : ________________________________________.
+     | bar1 : nat -> bar
+     | bar2 : bar -> bar
+     | bar3 : bool -> bar -> bar
 
 *)
 (** [] *)
