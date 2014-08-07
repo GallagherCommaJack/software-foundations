@@ -10,7 +10,7 @@
 
 (** * From the Coq Standard Library *)
 
-Require Omega.   (* needed for using the [omega] tactic *)
+Require Export Omega.   (* needed for using the [omega] tactic *)
 Require Export Bool.
 Require Export List.
 Export ListNotations.
@@ -70,14 +70,14 @@ Proof.
 
 Theorem andb_true_elim2 : forall b c,
   andb b c = true -> c = true.
-Proof.
-(* An exercise in Basics.v *)
-Admitted.
+Proof. intros. destruct b; inversion H; apply H0. Qed.
+
 
 Theorem beq_nat_sym : forall (n m : nat),
   beq_nat n m = beq_nat m n.
-(* An exercise in Lists.v *)
-Admitted.
+Proof. induction n; destruct m; 
+       [reflexivity | reflexivity | reflexivity | apply IHn].
+Qed.
 
 (** * From Props.v *)
 
@@ -100,9 +100,14 @@ Proof.
 Theorem false_beq_nat: forall n n' : nat,
      n <> n' ->
      beq_nat n n' = false.
-Proof. 
-(* An exercise in Logic.v *)
-Admitted.
+Proof. induction n as [|m]; intros.
+       Case "n = 0". destruct n' as [|n''].
+         exfalso. apply H. reflexivity.
+         reflexivity.
+       Case "n = S m".
+         destruct n' as [|n'']. reflexivity. simpl. apply IHm.
+         intro. apply H. apply f_equal. apply H0.
+Qed.
 
 Theorem ex_falso_quodlibet : forall (P:Prop),
   False -> P.
@@ -112,19 +117,31 @@ Proof.
 
 Theorem ev_not_ev_S : forall n,
   ev n -> ~ ev (S n).
-Proof. 
-(* An exercise in Logic.v *)
-Admitted.
+Proof. intros. induction H; intro; inversion H.
+       subst. inversion H0. apply IHev. apply H2.
+       apply IHev. inversion H0. subst. apply H4.
+Qed.
 
 Theorem ble_nat_true : forall n m,
   ble_nat n m = true -> n <= m.
-(* An exercise in Logic.v *)
-Admitted.
+Proof. induction n; intros. apply le_0_n. 
+       destruct m. inversion H. apply le_n_S. apply IHn. apply H.
+Qed.
+
+Theorem ble_nat_refl : forall n, ble_nat n n = true.
+Proof. induction n. reflexivity. apply IHn. Qed.
 
 Theorem ble_nat_false : forall n m,
   ble_nat n m = false -> ~(n <= m).
-(* An exercise in Logic.v *)
-Admitted.
+Proof. intros. intro. induction H0.
+       rewrite ble_nat_refl in H. inversion H.
+       apply IHle.
+       assert (forall y x, ble_nat x (S y) = false -> ble_nat x y = false).
+         induction y; intros; destruct x. inversion H1. 
+         destruct x; inversion H1. reflexivity. inversion H1. inversion H1.
+         simpl. rewrite H3. apply IHy. apply H3.
+       apply H1. apply H.
+Qed.
 
 Inductive appears_in (n : nat) : list nat -> Prop :=
 | ai_here : forall l, appears_in n (n::l)
@@ -153,7 +170,8 @@ Inductive multi (X:Type) (R: relation X)
                     R x y ->
                     multi X R y z ->
                     multi X R x z.
-Implicit Arguments multi [[X]]. 
+
+Arguments multi {X} R x1 x2.
 
 Tactic Notation "multi_cases" tactic(first) ident(c) :=
   first;
@@ -163,15 +181,17 @@ Theorem multi_R : forall (X:Type) (R:relation X) (x y : X),
        R x y -> multi R x y.
 Proof.
   intros X R x y r.
-  apply multi_step with y. apply r. apply multi_refl.   Qed.
+  apply multi_step with y. apply r. apply multi_refl. Qed.
 
 Theorem multi_trans :
   forall (X:Type) (R: relation X) (x y z : X),
       multi R x y  ->
       multi R y z ->
       multi R x z.
-Proof.
-  (* FILL IN HERE *) Admitted.
+Proof. intros. multi_cases (induction H) H'.
+       apply H0. apply IHmulti in H0. apply multi_step with y.
+       apply H. apply H0.
+Qed.  
 
 (**  Identifiers and polymorphic partial maps. *)
 
@@ -199,8 +219,7 @@ Qed.
 
 Lemma neq_id : forall (T:Type) x y (p q:T), x <> y -> 
                (if eq_id_dec x y then p else q) = q. 
-Proof.
-  (* FILL IN HERE *) Admitted.
+Proof. intros. destruct (eq_id_dec x y). contradiction. reflexivity. Qed.
 
 Definition partial_map (A:Type) := id -> option A.
 
@@ -248,3 +267,36 @@ Tactic Notation "solve" "by" "inversion" "3" :=
   solve_by_inversion_step (solve by inversion 2).
 Tactic Notation "solve" "by" "inversion" :=
   solve by inversion 1.
+
+(** Things that should be here but aren't *)
+Theorem rev_snoc : forall X : Type,
+                     forall v : X,
+                     forall s : list X,
+  rev (s ++ [v]) = v :: (rev s).
+Proof. intros. induction s.
+       Case "s = []".
+         reflexivity.
+       Case "s = x :: s'".
+         simpl. rewrite -> IHs. reflexivity.
+Qed.
+
+Theorem rev_involutive : forall X : Type, forall l : list X,
+  rev (rev l) = l.
+Proof. intros; induction l.
+       Case "l = []".
+         reflexivity.
+       Case "l = x :: l'".
+         simpl. rewrite rev_snoc. rewrite IHl. reflexivity.
+Qed.         
+
+Theorem snoc_with_append : forall X : Type,
+                         forall l1 l2 : list X,
+                         forall v : X,
+ (l1 ++ l2) ++ [v] = l1 ++ (l2 ++ [v]).
+Proof. intros; induction l1.
+       Case "l1 = []".
+         reflexivity.
+       Case "l1 = x :: l1'".
+         simpl. rewrite IHl1. reflexivity.
+Qed.
+
