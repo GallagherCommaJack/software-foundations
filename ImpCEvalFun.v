@@ -181,15 +181,18 @@ Definition test_ceval (st:state) (c:com) :=
    [X] (inclusive: [1 + 2 + ... + X]) in the variable [Y].  Make sure
    your solution satisfies the test that follows. *)
 
-Definition pup_to_n : com := 
-  (* FILL IN HERE *) admit.
+Definition pup_to_n : com :=
+  (Y ::= ANum 0;;
+     WHILE BNot (BEq (AId X) (ANum 0)) 
+     DO Y ::= APlus (AId X) (AId Y);; X ::= AMinus (AId X) (ANum 1)
+     END).
 
-(* 
+ 
 Example pup_to_n_1 : 
   test_ceval (update empty_state X 5) pup_to_n
   = Some (0, 15, 0).
 Proof. reflexivity. Qed.
-*)
+
 (** [] *)
 
 (** **** Exercise: 2 stars, optional (peven) *)
@@ -328,7 +331,24 @@ Theorem ceval__ceval_step: forall c st st',
 Proof. 
   intros c st st' Hce.
   ceval_cases (induction Hce) Case.
-  (* FILL IN HERE *) Admitted.
+  Case "E_Skip". exists 1; simpl; reflexivity.
+  Case "E_Ass". exists 1; simpl; rewrite H; reflexivity.
+  Case "E_Seq". inversion IHHce1; inversion IHHce2; subst.
+    exists (S x + x0). simpl. 
+    eapply ceval_step_more in H. eapply ceval_step_more in H0.
+    rewrite H. rewrite H0. reflexivity.
+    apply le_plus_r. apply le_plus_l.
+  Case "E_IfTrue". inversion IHHce.
+    exists (S x). simpl. rewrite H. apply H0.
+  Case "E_IfFalse". inversion IHHce.
+    exists (S x). simpl. rewrite H. apply H0.
+  Case "E_WhileEnd". exists 1. simpl. rewrite H. reflexivity.
+  Case "E_WhileLoop". inversion IHHce1. inversion IHHce2.
+    exists (S x + x0). simpl. rewrite H.
+    eapply ceval_step_more in H0. rewrite H0.
+    eapply ceval_step_more in H1. apply H1.
+    apply le_plus_r. apply le_plus_l.
+Qed.
 (** [] *)
 
 Theorem ceval_and_ceval_step_coincide: forall c st st',
