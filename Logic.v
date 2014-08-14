@@ -424,8 +424,8 @@ Proof.
 (** **** Exercise: 2 stars, optional (bool_prop) *)
 Theorem andb_false : forall b c,
   andb b c = false -> b = false \/ c = false.
-Proof. 
-  (* FILL IN HERE *) Admitted.
+Proof. intros; destruct b; destruct c; inversion H; firstorder. Qed.
+  
 
 Theorem orb_prop : forall b c,
   orb b c = true -> b = true \/ c = true.
