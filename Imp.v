@@ -604,7 +604,7 @@ and it offers plenty of power for many purposes.  Here's an example.
   Lemma Sn_nle_n : forall n, ~ (S n <= n).
   Proof. induction n; intros; intro; inversion H.
          apply (n_neq_Sn n). symmetry. apply H1.
-         apply IHn. SearchAbout le. apply le_Sn_le. apply H1.
+         apply IHn. apply le_Sn_le. apply H1.
   Qed.
 
   Lemma n_le_m_neq_Sm : forall n m, n <= m -> n <> S m.
@@ -2097,8 +2097,8 @@ Theorem ceval_deterministic: forall (c:com) st st1 st2 s1 s2,
      c / st || s2 / st2 ->
      st1 = st2 /\ s1 = s2.
 Proof. 
-(* No clue what I"m doing here - 
-can't seem to figure out the right induction scheme *)
+(** No clue what to do here 
+    can't seem to figure out the right induction scheme *)
 Abort.
 End BreakImp.
 (** [] *)
