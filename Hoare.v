@@ -104,7 +104,13 @@ Definition as4 : Assertion :=
 Definition as5 : Assertion := fun st => True.
 Definition as6 : Assertion := fun st => False.
 
-(* FILL IN HERE *)
+(* as1: st assigns X to 3 *)
+(* as2: st assigns X to a value less than or equal to the value it assigns to Y *)
+(* as3: st assigns X to 3 or the value it assigns to Y *)
+(* as4: st assigns Z to the a value beneath the square root of X 
+                            and above its predecessor *)
+(* as5: for any st, st implies true *)
+(* as6: st is not constructible *)
 
 End ExAssertions.
 (** [] *)
@@ -201,8 +207,12 @@ Notation "{{ P }}  c  {{ Q }}" :=
       {{(Z * Z) <= m /\ ~ (((S Z) * (S Z)) <= m)}}
 
  *)
-
-
+(* 1: forall endstates of c, X = 5*)
+(* 2: c adds 5 to X in all its endstates *)
+(* 3: if x <= y in st, y <= x in st' where c / st || st' *)
+(* 4: c doesn't terminate *)
+(* 5: c assigns Y to real_fact X *)
+(* 6: forall endstates of c, z >= floor (sqrt m) and z <= ceil (sqrt m) *)
 (** [] *)
 
 
