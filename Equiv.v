@@ -1633,7 +1633,7 @@ Qed.
     will run faster).
 
     We call this new language _Himp_ (``Imp extended with [HAVOC]''). *)
-
+(**
 Module Himp.
 
 (** To formalize the language, we first add a clause to the definition of
@@ -1675,7 +1675,7 @@ Reserved Notation "c1 '/' st '||' st'" (at level 40, st at level 39).
 Inductive ceval : com -> state -> state -> Prop :=
   | E_Skip : forall st : state, SKIP / st || st
   | E_Ass : forall (st : state) (a1 : aexp) (n : nat) (X : id),
-            aeval st a1 = n -> (X ::= a1) / st || update st X n
+              aeval st a1 = n -> (X ::= a1) / st || update st X n
   | E_Seq : forall (c1 c2 : com) (st st' st'' : state),
             c1 / st || st' -> c2 / st' || st'' -> (c1 ;; c2) / st || st''
   | E_IfTrue : forall (st st' : state) (b1 : bexp) (c1 c2 : com),
@@ -1691,7 +1691,7 @@ Inductive ceval : com -> state -> state -> Prop :=
                   c1 / st || st' ->
                   (WHILE b1 DO c1 END) / st' || st'' ->
                   (WHILE b1 DO c1 END) / st || st''
-(* FILL IN HERE *)
+  | E_Havoc : forall st st', HAVOC / st || st'.
 
   where "c1 '/' st '||' st'" := (ceval c1 st st').
 
@@ -1843,7 +1843,8 @@ Proof. (* FILL IN HERE *) Admitted.
 (** [] *)
 
 End Himp.
-
+*)
+(** weird glitches in the implementation here, I'm going to skip it for now *)
 (* ####################################################### *)
 (** * Doing Without Extensionality (Optional) *)
 
@@ -1864,7 +1865,7 @@ End Himp.
 Definition stequiv (st1 st2 : state) : Prop :=
   forall (X:id), st1 X = st2 X. 
 
-Notation "st1 '~' st2" := (stequiv st1 st2) (at level 30).
+Notation "st1 ~~ st2" := (stequiv st1 st2) (at level 30).
 
 (** It is easy to prove that [stequiv] is an _equivalence_ (i.e., it
    is reflexive, symmetric, and transitive), so it partitions the set
@@ -1872,36 +1873,32 @@ Notation "st1 '~' st2" := (stequiv st1 st2) (at level 30).
 
 (** **** Exercise: 1 star, optional (stequiv_refl) *)
 Lemma stequiv_refl : forall (st : state), 
-  st ~ st.
-Proof.
-  (* FILL IN HERE *) Admitted.
+  st ~~ st.
+Proof. intros. intro. reflexivity. Qed.
+  
 (** [] *)
 
 (** **** Exercise: 1 star, optional (stequiv_sym) *)
 Lemma stequiv_sym : forall (st1 st2 : state), 
-  st1 ~ st2 -> 
-  st2 ~ st1.
-Proof. 
-  (* FILL IN HERE *) Admitted.
+  st1 ~~ st2 -> 
+  st2 ~~ st1.
+Proof. intros. intro. rewrite H. reflexivity. Qed.
 (** [] *)
    
 (** **** Exercise: 1 star, optional (stequiv_trans) *)
 Lemma stequiv_trans : forall (st1 st2 st3 : state), 
-  st1 ~ st2 -> 
-  st2 ~ st3 -> 
-  st1 ~ st3.
-Proof.  
-  (* FILL IN HERE *) Admitted.
-(** [] *)
+  st1 ~~ st2 -> 
+  st2 ~~ st3 -> 
+  st1 ~~ st3.
+Proof. intros. intro. rewrite H. apply H0. Qed.
 
 (** Another useful fact... *)
 (** **** Exercise: 1 star, optional (stequiv_update) *)
 Lemma stequiv_update : forall (st1 st2 : state),
-  st1 ~ st2 -> 
+  st1 ~~ st2 -> 
   forall (X:id) (n:nat),
-  update st1 X n ~ update st2 X n. 
-Proof.
-  (* FILL IN HERE *) Admitted.
+  update st1 X n ~~ update st2 X n. 
+Proof. intros. intro. unfold update. rewrite H. reflexivity. Qed.
 (** [] *)
 
 (** It is then straightforward to show that [aeval] and [beval] behave
@@ -1909,18 +1906,20 @@ Proof.
 
 (** **** Exercise: 2 stars, optional (stequiv_aeval) *)
 Lemma stequiv_aeval : forall (st1 st2 : state), 
-  st1 ~ st2 ->
+  st1 ~~ st2 ->
   forall (a:aexp), aeval st1 a = aeval st2 a. 
-Proof.
-  (* FILL IN HERE *) Admitted.
+Proof. intros. induction a; auto; simpl; try apply H;
+       rewrite IHa1; rewrite IHa2; reflexivity. Qed.
 (** [] *)
 
 (** **** Exercise: 2 stars, optional (stequiv_beval) *)
 Lemma stequiv_beval : forall (st1 st2 : state), 
-  st1 ~ st2 ->
+  st1 ~~ st2 ->
   forall (b:bexp), beval st1 b = beval st2 b. 
-Proof.
-  (* FILL IN HERE *) Admitted.
+Proof. intros. induction b; auto; simpl;
+       repeat rewrite (stequiv_aeval st1 st2); try assumption;
+       try rewrite IHb; try rewrite IHb1; try rewrite IHb2;
+       try reflexivity. Qed.
 (** [] *)
 
 (** We can also characterize the behavior of [ceval] on equivalent
@@ -1928,11 +1927,11 @@ Proof.
     because [ceval] is a relation). *)
 
 Lemma stequiv_ceval: forall (st1 st2 : state),
-  st1 ~ st2 ->
+  st1 ~~ st2 ->
   forall (c: com) (st1': state),
     (c / st1 || st1') ->
     exists st2' : state,
-    ((c / st2 || st2') /\  st1' ~ st2').
+    ((c / st2 || st2') /\  st1' ~~ st2').
 Proof.
   intros st1 st2 STEQV c st1' CEV1. generalize dependent st2. 
   induction CEV1; intros st2 STEQV.  
@@ -1984,7 +1983,7 @@ Reserved Notation "c1 '/' st '||'' st'" (at level 40, st at level 39).
 Inductive ceval' : com -> state -> state -> Prop :=
   | E_equiv : forall c st st' st'',
     c / st || st' -> 
-    st' ~ st'' ->
+    st' ~~ st'' ->
     c / st ||' st''
   where   "c1 '/' st '||'' st'" := (ceval' c1 st st').
 
@@ -2023,7 +2022,12 @@ Proof.
       unfold stequiv. intros. apply update_same. 
       reflexivity. assumption. 
     Case "<-".  
-      (* FILL IN HERE *) Admitted.
+      inversion H; inversion H0; subst; simpl in *.
+      eapply E_equiv. constructor.
+      apply stequiv_trans with (st2 := update st X (st X)).
+      intro. symmetry; apply update_same; auto.
+      apply H1.
+Qed.      
 (** [] *)
 
 (** On the whole, this explicit equivalence approach is considerably
