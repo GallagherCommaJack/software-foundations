@@ -51,15 +51,14 @@ Lemma H_Consequence_pre : forall (P Q P': Assertion) c,
     hoare_proof P' c Q ->
     (forall st, P st -> P' st) ->
     hoare_proof P c Q.
-Proof.
-  (* FILL IN HERE *) Admitted.
+Proof. intros; apply H_Consequence with (P' := P') (Q' := Q); firstorder. Qed.
 
 Lemma H_Consequence_post  : forall (P Q Q' : Assertion) c, 
     hoare_proof P c Q' ->
     (forall st, Q' st -> Q st) ->
     hoare_proof P c Q.
-Proof.
-  (* FILL IN HERE *) Admitted.
+Proof. intros; apply H_Consequence with (P' := P) (Q' := Q'); firstorder. Qed.
+  
 
 
 (** Now, for example, let's construct a proof object representing a
@@ -96,6 +95,20 @@ Print sample_proof.
 
 (** **** Exercise: 2 stars (hoare_proof_sound) *)
 (** Prove that such proof objects represent true claims. *)
+
+Theorem while_skip_no_term : forall b st st',
+                               beval st b = true ->
+                               ~ (WHILE b DO SKIP END / st || st').
+Proof. intros. intro. remember (WHILE b DO SKIP END) as loopdef eqn:whb.
+       ceval_cases (induction H0) Case; inversion whb; subst.
+       Case "E_WhileEnd". rewrite H in H0. inversion H0.
+       Case "E_WhileLoop". apply IHceval2.
+         SCase "beval st' b = true" (* Note: it doesn't, contradiction time *).
+           destruct (beval st' b) eqn:bst'b; try reflexivity;
+           inversion H0_0; subst; inversion H0_; subst; 
+           rewrite bst'b in *; apply H0 (* now a contradiction *).
+         SCase "WHILE b DO SKIP END = WHILE b DO SKIP END". reflexivity.
+Qed.
 
 Theorem hoare_proof_sound : forall P c Q,
   hoare_proof P c Q -> {{P}} c {{Q}}.
