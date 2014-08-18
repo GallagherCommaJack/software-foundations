@@ -113,7 +113,14 @@ Qed.
 Theorem hoare_proof_sound : forall P c Q,
   hoare_proof P c Q -> {{P}} c {{Q}}.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  intros P c Q X. hoare_proof_cases (induction X) Case; intros st st' Hc Hp;
+                  [eapply hoare_skip | eapply hoare_asgn | 
+                   eapply hoare_seq | eapply hoare_if |
+                   eapply hoare_while | eapply hoare_consequence];
+                  try apply IHX; try apply IHX1; try apply IHX2; 
+                  try apply Hc; try apply Hp; intro; try apply p; try apply q.
+Qed.
+
 (** [] *)
 
 (** We can also use Coq's reasoning facilities to prove metatheorems
@@ -223,13 +230,13 @@ Definition wp (c:com) (Q:Assertion) : Assertion :=
 
 Lemma wp_is_precondition: forall c Q, 
   {{wp c Q}} c {{Q}}. 
-(* FILL IN HERE *) Admitted.
+Proof. intros. intro. intros. apply H0. apply H. Qed.
 
 (** **** Exercise: 1 star (wp_is_weakest) *)
 
 Lemma wp_is_weakest: forall c Q P', 
-   {{P'}} c {{Q}} -> forall st, P' st -> wp c Q st. 
-(* FILL IN HERE *) Admitted.
+   {{P'}} c {{Q}} -> forall st, P' st -> wp c Q st.
+Proof. intros. intro. intros. eapply H. apply H1. apply H0. Qed.
 
 (** The following utility lemma will also be useful. *)
 
@@ -264,7 +271,14 @@ Proof.
        intros st st' E1 H. unfold wp. intros st'' E2.  
          eapply HT. econstructor; eassumption. assumption.
      eapply IHc2. intros st st' E1 H. apply H; assumption.  
-  (* FILL IN HERE *) Admitted.
+  Case "IFB".
+    eapply H_If; [apply IHc1 | apply IHc2]; intro; intros; destruct H0;
+    eapply HT; try eassumption.
+    apply E_IfTrue. apply H1. apply H.
+    apply E_IfFalse. apply not_true_iff_false. apply H1. apply H.
+  Case "WHILE".
+    admit.
+Qed.    
 
 (** Finally, we might hope that our axiomatic Hoare logic is _decidable_; 
     that is, that there is an (terminating) algorithm (a _decision procedure_)
