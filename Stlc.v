@@ -42,15 +42,15 @@ Require Export Types.
 
 (** Informal concrete syntax: 
        t ::= x                       variable
-           | \x:T1.t2                abstraction
+           | λx:T1.t2                abstraction
            | t1 t2                   application
            | true                    constant true
            | false                   constant false
            | if t1 then t2 else t3   conditional
 *)
 
-(** The [\] symbol (backslash, in ascii) in a function abstraction
-    [\x:T1.t2] is generally written as a greek letter "lambda" (hence
+(** The [λ] symbol (backslash, in ascii) in a function abstraction
+    [λx:T1.t2] is generally written as a greek letter "lambda" (hence
     the name of the calculus).  The variable [x] is called the
     _parameter_ to the function; the term [t1] is its _body_.  The
     annotation [:T] specifies the type of arguments that the function
@@ -58,46 +58,46 @@ Require Export Types.
 
 (** Some examples:
 
-      - [\x:Bool. x]
+      - [λx:Bool. x]
 
         The identity function for booleans.
 
-      - [(\x:Bool. x) true]
+      - [(λx:Bool. x) true]
 
         The identity function for booleans, applied to the boolean [true].
 
-      - [\x:Bool. if x then false else true]
+      - [λx:Bool. if x then false else true]
 
         The boolean "not" function.
 
-      - [\x:Bool. true]
+      - [λx:Bool. true]
 
         The constant function that takes every (boolean) argument to
         [true]. *)
 (**  
-      - [\x:Bool. \y:Bool. x]
+      - [λx:Bool. λy:Bool. x]
 
         A two-argument function that takes two booleans and returns
         the first one.  (Note that, as in Coq, a two-argument function
         is really a one-argument function whose body is also a
         one-argument function.)
 
-      - [(\x:Bool. \y:Bool. x) false true]
+      - [(λx:Bool. λy:Bool. x) false true]
 
         A two-argument function that takes two booleans and returns
         the first one, applied to the booleans [false] and [true].
 
         Note that, as in Coq, application associates to the left --
-        i.e., this expression is parsed as [((\x:Bool. \y:Bool. x)
+        i.e., this expression is parsed as [((λx:Bool. λy:Bool. x)
         false) true].
 
-      - [\f:Bool->Bool. f (f true)]
+      - [λf:Bool->Bool. f (f true)]
 
         A higher-order function that takes a _function_ [f] (from
         booleans to booleans) as an argument, applies [f] to [true],
         and applies [f] again to the result.
 
-      - [(\f:Bool->Bool. f (f true)) (\x:Bool. false)]
+      - [(λf:Bool->Bool. f (f true)) (λx:Bool. false)]
 
         The same higher-order function, applied to the constantly
         [false] function. *)
@@ -122,17 +122,17 @@ Require Export Types.
           | T1 -> T2
     For example:
 
-      - [\x:Bool. false] has type [Bool->Bool]
+      - [λx:Bool. false] has type [Bool->Bool]
 
-      - [\x:Bool. x] has type [Bool->Bool]
+      - [λx:Bool. x] has type [Bool->Bool]
 
-      - [(\x:Bool. x) true] has type [Bool]
+      - [(λx:Bool. x) true] has type [Bool]
 
-      - [\x:Bool. \y:Bool. x] has type [Bool->Bool->Bool] (i.e. [Bool -> (Bool->Bool)])
+      - [λx:Bool. λy:Bool. x] has type [Bool->Bool->Bool] (i.e. [Bool -> (Bool->Bool)])
 
-      - [(\x:Bool. \y:Bool. x) false] has type [Bool->Bool]
+      - [(λx:Bool. λy:Bool. x) false] has type [Bool->Bool]
 
-      - [(\x:Bool. \y:Bool. x) false true] has type [Bool]
+      - [(λx:Bool. λy:Bool. x) false true] has type [Bool]
 *)
 
 
@@ -168,13 +168,16 @@ Tactic Notation "t_cases" tactic(first) ident(c) :=
   | Case_aux c "tabs" | Case_aux c "ttrue" 
   | Case_aux c "tfalse" | Case_aux c "tif" ].
 
-(** Note that an abstraction [\x:T.t] (formally, [tabs x T t]) is
+(** Note that an abstraction [λx:T.t] (formally, [tabs x T t]) is
     always annotated with the type [T] of its parameter, in contrast
     to Coq (and other functional languages like ML, Haskell, etc.),
     which use _type inference_ to fill in missing annotations.  We're
     not considering type inference here, to keep things simple. *)
 
 (** Some examples... *)
+
+Notation "'λ' x ':' T , e" := (tabs x T e)
+  (at level 200, right associativity) : tm_scope.
 
 Definition x := (Id 0).
 Definition y := (Id 1).
@@ -183,28 +186,28 @@ Hint Unfold x.
 Hint Unfold y.
 Hint Unfold z.
 
-(** [idB = \x:Bool. x] *)
+(** [idB = λx:Bool. x] *)
 
 Notation idB := 
   (tabs x TBool (tvar x)).
 
-(** [idBB = \x:Bool->Bool. x] *)
+(** [idBB = λx:Bool->Bool. x] *)
 
 Notation idBB := 
   (tabs x (TArrow TBool TBool) (tvar x)).
 
-(** [idBBBB = \x:(Bool->Bool) -> (Bool->Bool). x] *)
+(** [idBBBB = λx:(Bool->Bool) -> (Bool->Bool). x] *)
 
 Notation idBBBB :=
   (tabs x (TArrow (TArrow TBool TBool) 
                       (TArrow TBool TBool)) 
     (tvar x)).
 
-(** [k = \x:Bool. \y:Bool. x] *)
+(** [k = λx:Bool. λy:Bool. x] *)
 
 Notation k := (tabs x TBool (tabs y TBool (tvar x))).
 
-(** [notB = \x:Bool. if x then false else true] *)
+(** [notB = λx:Bool. if x then false else true] *)
 
 Notation notB := (tabs x TBool (tif (tvar x) tfalse ttrue)).
 
@@ -236,12 +239,12 @@ Notation notB := (tabs x TBool (tif (tvar x) tfalse ttrue)).
 
 (** Third, for abstractions, we have a choice:
 
-      - We can say that [\x:T.t1] is a value only when [t1] is a
+      - We can say that [λx:T.t1] is a value only when [t1] is a
         value -- i.e., only if the function's body has been
         reduced (as much as it can be without knowing what argument it
         is going to be applied to).
 
-      - Or we can say that [\x:T.t1] is always a value, no matter
+      - Or we can say that [λx:T.t1] is always a value, no matter
         whether [t1] is one or not -- in other words, we can say that
         reduction stops at abstractions.
 
@@ -293,7 +296,7 @@ Hint Constructors value.
     semantics of function application, where we will need to
     substitute the argument term for the function parameter in the
     function's body.  For example, we reduce
-       (\x:Bool. if x then true else x) false
+       (λx:Bool. if x then true else x) false
     to 
        if false then true else false
 ]] 
@@ -317,24 +320,24 @@ Hint Constructors value.
 
       - [[x:=true] false] yields [false] (vacuous substitution)
 
-      - [[x:=true] (\y:Bool. if y then x else false)] yields [\y:Bool. if y then true else false]
-      - [[x:=true] (\y:Bool. x)] yields [\y:Bool. true]
+      - [[x:=true] (λy:Bool. if y then x else false)] yields [λy:Bool. if y then true else false]
+      - [[x:=true] (λy:Bool. x)] yields [λy:Bool. true]
 
-      - [[x:=true] (\y:Bool. y)] yields [\y:Bool. y]
+      - [[x:=true] (λy:Bool. y)] yields [λy:Bool. y]
 
-      - [[x:=true] (\x:Bool. x)] yields [\x:Bool. x]
+      - [[x:=true] (λx:Bool. x)] yields [λx:Bool. x]
 
     The last example is very important: substituting [x] with [true] in
-    [\x:Bool. x] does _not_ yield [\x:Bool. true]!  The reason for
-    this is that the [x] in the body of [\x:Bool. x] is _bound_ by the
+    [λx:Bool. x] does _not_ yield [λx:Bool. true]!  The reason for
+    this is that the [x] in the body of [λx:Bool. x] is _bound_ by the
     abstraction: it is a new, local name that just happens to be
     spelled the same as some global name [x]. *)
 
 (** Here is the definition, informally...
    [x:=s]x = s
    [x:=s]y = y                                   if x <> y
-   [x:=s](\x:T11.t12)   = \x:T11. t12      
-   [x:=s](\y:T11.t12)   = \y:T11. [x:=s]t12      if x <> y
+   [x:=s](λx:T11.t12)   = λx:T11. t12      
+   [x:=s](λy:T11.t12)   = λy:T11. [x:=s]t12      if x <> y
    [x:=s](t1 t2)        = ([x:=s]t1) ([x:=s]t2)       
    [x:=s]true           = true
    [x:=s]false          = false
@@ -369,7 +372,7 @@ where "'[' x ':=' s ']' t" := (subst x s t).
     consider the case where [s], the term being substituted for a
     variable in some other term, may itself contain free variables.
     Since we are only interested here in defining the [step] relation
-    on closed terms (i.e., terms like [\x:Bool. x], that do not mention
+    on closed terms (i.e., terms like [λx:Bool. x], that do not mention
     variables are not bound by some enclosing lambda), we can skip
     this extra complexity here, but it must be dealt with when
     formalizing richer languages. *)
@@ -385,8 +388,7 @@ where "'[' x ':=' s ']' t" := (subst x s t).
     constructors. *)
 
 Inductive substi (s:tm) (x:id) : tm -> tm -> Prop := 
-  | s_var1 : 
-      substi s x (tvar x) s
+  | s_var1 : substi s x (tvar x) s
   (* FILL IN HERE *)
 .
 
@@ -408,13 +410,13 @@ Proof.
     side (the argument) until it is also a value; and finally we
     substitute the argument for the bound variable in the body of the
     function.  This last rule, written informally as
-      (\x:T.t12) v2 ==> [x:=v2]t12
+      (λx:T.t12) v2 ==> [x:=v2]t12
     is traditionally called "beta-reduction". *)
 
 (** 
                                value v2
                      ----------------------------                   (ST_AppAbs)
-                     (\x:T.t12) v2 ==> [x:=v2]t12
+                     (λx:T.t12) v2 ==> [x:=v2]t12
 
                               t1 ==> t1'
                            ----------------                           (ST_App1)
@@ -475,7 +477,7 @@ Notation "t1 '==>*' t2" := (multistep t1 t2) (at level 40).
 (** *** Examples *)
 
 (** Example:
-    ((\x:Bool->Bool. x) (\x:Bool. x)) ==>* (\x:Bool. x)
+    ((λx:Bool->Bool. x) (λx:Bool. x)) ==>* (λx:Bool. x)
 i.e.
     (idBB idB) ==>* idB
 *)
@@ -490,8 +492,8 @@ Proof.
   apply multi_refl.  Qed.  
 
 (** Example:
-((\x:Bool->Bool. x) ((\x:Bool->Bool. x) (\x:Bool. x))) 
-      ==>* (\x:Bool. x)
+((λx:Bool->Bool. x) ((λx:Bool->Bool. x) (λx:Bool. x))) 
+      ==>* (λx:Bool. x)
 i.e.
   (idBB (idBB idB)) ==>* idB.
 *)
@@ -507,7 +509,7 @@ Proof.
   simpl. apply multi_refl.  Qed. 
 
 (** Example:
-((\x:Bool->Bool. x) (\x:Bool. if x then false
+((λx:Bool->Bool. x) (λx:Bool. if x then false
                               else true)) true)
       ==>* false
 i.e.
@@ -525,7 +527,7 @@ Proof.
     apply ST_IfTrue. apply multi_refl.  Qed. 
 
 (** Example:
-((\x:Bool->Bool. x) ((\x:Bool. if x then false
+((λx:Bool->Bool. x) ((λx:Bool. if x then false
                                else true) true))
       ==>* false
 i.e.
@@ -575,10 +577,11 @@ Proof. normalize.  Qed.
 Lemma step_example5 :
        (tapp (tapp idBBBB idBB) idB)
   ==>* idB.
-Proof.
-  (* FILL IN HERE *) Admitted.
+Proof. normalize. Qed.
 
-(* FILL IN HERE *)
+Lemma step_exampple5' : (tapp (tapp idBBBB idBB) idB) ==>* idB.
+Proof. repeat econstructor. Qed.
+  
 (** [] *)
 
 (* ###################################################################### *)
@@ -596,7 +599,7 @@ Proof.
     variables.
 
     This leads us to a three-place "typing judgment", informally
-    written [Gamma |- t \in T], where [Gamma] is a
+    written [Gamma |- t ∈ T], where [Gamma] is a
     "typing context" -- a mapping from variables to their types. *)
 
 (** We hide the definition of partial maps in a module since it is
@@ -638,57 +641,57 @@ Definition context := partial_map ty.
 (** 
                              Gamma x = T
                             --------------                              (T_Var)
-                            Gamma |- x \in T
+                            Gamma |- x ∈ T
 
-                      Gamma , x:T11 |- t12 \in T12
+                      Gamma , x:T11 |- t12 ∈ T12
                      ----------------------------                       (T_Abs)
-                     Gamma |- \x:T11.t12 \in T11->T12
+                     Gamma |- λx:T11.t12 ∈ T11->T12
 
-                        Gamma |- t1 \in T11->T12
-                          Gamma |- t2 \in T11
+                        Gamma |- t1 ∈ T11->T12
+                          Gamma |- t2 ∈ T11
                         ----------------------                          (T_App)
-                         Gamma |- t1 t2 \in T12
+                         Gamma |- t1 t2 ∈ T12
 
                          --------------------                          (T_True)
-                         Gamma |- true \in Bool
+                         Gamma |- true ∈ Bool
 
                         ---------------------                         (T_False)
-                        Gamma |- false \in Bool
+                        Gamma |- false ∈ Bool
 
-       Gamma |- t1 \in Bool    Gamma |- t2 \in T    Gamma |- t3 \in T
+       Gamma |- t1 ∈ Bool    Gamma |- t2 ∈ T    Gamma |- t3 ∈ T
        --------------------------------------------------------          (T_If)
-                  Gamma |- if t1 then t2 else t3 \in T
+                  Gamma |- if t1 then t2 else t3 ∈ T
 
 
-    We can read the three-place relation [Gamma |- t \in T] as: 
+    We can read the three-place relation [Gamma |- t ∈ T] as: 
     "to the term [t] we can assign the type [T] using as types for
     the free variables of [t] the ones specified in the context 
     [Gamma]." *)
 
-Reserved Notation "Gamma '|-' t '\in' T" (at level 40).
+Reserved Notation "Gamma '|-' t '∈' T" (at level 40).
     
 Inductive has_type : context -> tm -> ty -> Prop :=
   | T_Var : forall Gamma x T,
       Gamma x = Some T ->
-      Gamma |- tvar x \in T
+      Gamma |- tvar x ∈ T
   | T_Abs : forall Gamma x T11 T12 t12,
-      extend Gamma x T11 |- t12 \in T12 -> 
-      Gamma |- tabs x T11 t12 \in TArrow T11 T12
+      extend Gamma x T11 |- t12 ∈ T12 -> 
+      Gamma |- tabs x T11 t12 ∈ TArrow T11 T12
   | T_App : forall T11 T12 Gamma t1 t2,
-      Gamma |- t1 \in TArrow T11 T12 -> 
-      Gamma |- t2 \in T11 -> 
-      Gamma |- tapp t1 t2 \in T12
+      Gamma |- t1 ∈ TArrow T11 T12 -> 
+      Gamma |- t2 ∈ T11 -> 
+      Gamma |- tapp t1 t2 ∈ T12
   | T_True : forall Gamma,
-       Gamma |- ttrue \in TBool
+       Gamma |- ttrue ∈ TBool
   | T_False : forall Gamma,
-       Gamma |- tfalse \in TBool
+       Gamma |- tfalse ∈ TBool
   | T_If : forall t1 t2 t3 T Gamma,
-       Gamma |- t1 \in TBool ->
-       Gamma |- t2 \in T ->
-       Gamma |- t3 \in T ->
-       Gamma |- tif t1 t2 t3 \in T
+       Gamma |- t1 ∈ TBool ->
+       Gamma |- t2 ∈ T ->
+       Gamma |- t3 ∈ T ->
+       Gamma |- tif t1 t2 t3 ∈ T
 
-where "Gamma '|-' t '\in' T" := (has_type Gamma t T).
+where "Gamma '|-' t '∈' T" := (has_type Gamma t T).
 
 Tactic Notation "has_type_cases" tactic(first) ident(c) :=
   first;
@@ -702,7 +705,7 @@ Hint Constructors has_type.
 (** *** Examples *)
 
 Example typing_example_1 :
-  empty |- tabs x TBool (tvar x) \in TArrow TBool TBool.
+  empty |- tabs x TBool (tvar x) ∈ TArrow TBool TBool.
 Proof.
   apply T_Abs. apply T_Var. reflexivity.  Qed.
 
@@ -710,19 +713,19 @@ Proof.
     database, auto can actually solve this one immediately. *)
 
 Example typing_example_1' :
-  empty |- tabs x TBool (tvar x) \in TArrow TBool TBool.
+  empty |- tabs x TBool (tvar x) ∈ TArrow TBool TBool.
 Proof. auto.  Qed.
 
 (** Another example:
-     empty |- \x:A. \y:A->A. y (y x)) 
-           \in A -> (A->A) -> A.
+     empty |- λx:A. λy:A->A. y (y x)) 
+           ∈ A -> (A->A) -> A.
 *)
 
 Example typing_example_2 :
   empty |-
     (tabs x TBool
        (tabs y (TArrow TBool TBool)
-          (tapp (tvar y) (tapp (tvar y) (tvar x))))) \in
+          (tapp (tvar y) (tapp (tvar y) (tvar x))))) ∈
     (TArrow TBool (TArrow (TArrow TBool TBool) TBool)).
 Proof with auto using extend_eq.
   apply T_Abs.
@@ -740,7 +743,7 @@ Example typing_example_2_full :
   empty |-
     (tabs x TBool
        (tabs y (TArrow TBool TBool)
-          (tapp (tvar y) (tapp (tvar y) (tvar x))))) \in
+          (tapp (tvar y) (tapp (tvar y) (tvar x))))) ∈
     (TArrow TBool (TArrow (TArrow TBool TBool) TBool)).
 Proof.
   (* FILL IN HERE *) Admitted.
@@ -749,9 +752,9 @@ Proof.
 (** **** Exercise: 2 stars (typing_example_3) *)
 (** Formally prove the following typing derivation holds: *)
 (** 
-   empty |- \x:Bool->B. \y:Bool->Bool. \z:Bool.
+   empty |- λx:Bool->B. λy:Bool->Bool. λz:Bool.
                y (x z) 
-         \in T.
+         ∈ T.
 *)
 
 Example typing_example_3 :
@@ -760,7 +763,7 @@ Example typing_example_3 :
       (tabs x (TArrow TBool TBool)
          (tabs y (TArrow TBool TBool)
             (tabs z TBool
-               (tapp (tvar y) (tapp (tvar x) (tvar z)))))) \in
+               (tapp (tvar y) (tapp (tvar x) (tvar z)))))) ∈
       T.
 Proof with auto.
   (* FILL IN HERE *) Admitted.
@@ -768,9 +771,9 @@ Proof with auto.
 
 (** We can also show that terms are _not_ typable.  For example, let's
     formally check that there is no typing derivation assigning a type
-    to the term [\x:Bool. \y:Bool, x y] -- i.e.,
+    to the term [λx:Bool. λy:Bool, x y] -- i.e.,
     ~ exists T,
-        empty |- \x:Bool. \y:Bool, x y : T.
+        empty |- λx:Bool. λy:Bool, x y : T.
 *)
 
 Example typing_nonexample_1 :
@@ -778,7 +781,7 @@ Example typing_nonexample_1 :
       empty |- 
         (tabs x TBool
             (tabs y TBool
-               (tapp (tvar x) (tvar y)))) \in
+               (tapp (tvar x) (tvar y)))) ∈
         T.
 Proof.
   intros Hc. inversion Hc.
@@ -795,14 +798,14 @@ Proof.
 (** **** Exercise: 3 stars, optional (typing_nonexample_3) *)
 (** Another nonexample:
     ~ (exists S, exists T,
-          empty |- \x:S. x x : T).
+          empty |- λx:S. x x : T).
 *)
 
 Example typing_nonexample_3 :
   ~ (exists S, exists T,
         empty |- 
           (tabs x S
-             (tapp (tvar x) (tvar x))) \in
+             (tapp (tvar x) (tvar x))) ∈
           T).
 Proof.
   (* FILL IN HERE *) Admitted.
