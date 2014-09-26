@@ -1641,7 +1641,6 @@ Proof.
 
 (* What ix XtimesYinZ?  What operation is that supposed to be? *)
 (** [] *)
-Require Import CpdtTactics.
 (** **** Exercise: 3 stars (loop_never_stops) *)
 Theorem loop_never_stops : forall st st',
   ~(loop / st || st').
@@ -1715,7 +1714,7 @@ Proof. intros. generalize dependent st. induction H as [|i a| |]; intros.
        Case "c = IFB c1 THEN c2 ELSE c3 FI".
          remember (IHno_whilesR1 st); remember (IHno_whilesR2 st).
          destruct (beval st c1) eqn:bc1; [inversion e | inversion e0]; exists x;
-         constructor; assumption.
+         try (constructor; assumption); eapply E_IfFalse; assumption.
 Qed.
 (** [] *)
 

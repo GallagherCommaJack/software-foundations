@@ -678,7 +678,7 @@ we would have both [~ (P \/ ~P)] and [~ ~ (P \/ ~P)], a contradiction. *)
 
 Theorem excluded_middle_irrefutable:  forall (P:Prop), ~ ~ (P \/ ~ P).  
 Proof. intros. intro. apply H. right. intro. apply H.
-       apply or_introl with (Q:=~ P) in H0. apply H0.
+       apply or_introl with (Q:= ~ P) in H0. apply H0.
 Qed.       
 
 (* ########################################################## *)
