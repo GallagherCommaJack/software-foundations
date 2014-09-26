@@ -65,7 +65,7 @@ Inductive bvalue : tm -> Prop :=
 
 Inductive nvalue : tm -> Prop :=
   | nv_zero : nvalue tzero
-  | nv_succ : forall t, nvalue t -> nvalue (tsucc t).
+  | nv_succ : ∀ t, nvalue t -> nvalue (tsucc t).
 
 Definition value (t:tm) := bvalue t \/ nvalue t.
 
@@ -121,30 +121,30 @@ Hint Unfold extend.
 Reserved Notation "t1 '==>' t2" (at level 40).
 
 Inductive step : tm -> tm -> Prop :=
-  | ST_IfTrue : forall t1 t2,
+  | ST_IfTrue : ∀ t1 t2,
       (tif ttrue t1 t2) ==> t1
-  | ST_IfFalse : forall t1 t2,
+  | ST_IfFalse : ∀ t1 t2,
       (tif tfalse t1 t2) ==> t2
-  | ST_If : forall t1 t1' t2 t3,
+  | ST_If : ∀ t1 t1' t2 t3,
       t1 ==> t1' ->
       (tif t1 t2 t3) ==> (tif t1' t2 t3)
-  | ST_Succ : forall t1 t1',
+  | ST_Succ : ∀ t1 t1',
       t1 ==> t1' ->
       (tsucc t1) ==> (tsucc t1')
   | ST_PredZero :
       (tpred tzero) ==> tzero
-  | ST_PredSucc : forall t1,
+  | ST_PredSucc : ∀ t1,
       nvalue t1 ->
       (tpred (tsucc t1)) ==> t1
-  | ST_Pred : forall t1 t1',
+  | ST_Pred : ∀ t1 t1',
       t1 ==> t1' ->
       (tpred t1) ==> (tpred t1')
   | ST_IszeroZero :
       (tiszero tzero) ==> ttrue
-  | ST_IszeroSucc : forall t1,
+  | ST_IszeroSucc : ∀ t1,
        nvalue t1 ->
       (tiszero (tsucc t1)) ==> tfalse
-  | ST_Iszero : forall t1 t1',
+  | ST_Iszero : ∀ t1 t1',
       t1 ==> t1' ->
       (tiszero t1) ==> (tiszero t1')
 
@@ -191,7 +191,8 @@ Hint Unfold stuck.
 Example some_term_is_stuck :
   exists t, stuck t.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  exists (tiszero ttrue). split; intro; inversion H; inversion H0; inversion H2.
+Qed.
 (** [] *)
 
 (** However, although values and normal forms are not the same in this
@@ -208,10 +209,20 @@ Proof.
     is quite a bit shorter than the other.  For the sake of the
     exercise, try to complete the proof both ways. *)
 
-Lemma value_is_nf : forall t,
+Lemma value_is_nf : ∀ t,
   value t -> step_normal_form t.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  intros. inversion H; [Case "bvalue" | Case "nvalue"].
+  Case "bvalue". inversion H0; intro; inversion H2; inversion H3.
+  Case "nvalue". induction H0.
+    SCase "tzero". intro. inversion H0. inversion H1.
+    SCase "tsucc".
+      intro. inversion H1. inversion H2. subst.
+      apply IHnvalue.
+        right. apply H0.
+        exists t1'. apply H4.
+Qed.
+  
 (** [] *)
 
 
@@ -219,10 +230,31 @@ Proof.
 (** Using [value_is_nf], we can show that the [step] relation is
     also deterministic... *)
 
+Theorem nf_s : ∀ t, step_normal_form t -> step_normal_form (tsucc t).
+Proof. intros. intro. inversion H0. inversion H1. apply H. exists t1'. apply H3.
+Qed.
+
 Theorem step_deterministic:
   deterministic step.
 Proof with eauto.
-  (* FILL IN HERE *) Admitted.
+  unfold deterministic. intros. generalize dependent y2.
+  step_cases (induction H) Case; intros; inversion H0; subst; try reflexivity;
+  try (inversion H4; reflexivity); try (apply IHstep in H2; subst; reflexivity);
+  try (inversion H; reflexivity).
+  Case "ST_If". apply IHstep in H5. subst. reflexivity.
+  Case "ST_PredZero". inversion H1.
+  Case "ST_PredSucc". exfalso. eapply nf_s. eapply value_is_nf. 
+    right. apply H. exists t1'. apply H2.
+  Case "ST_Pred". inversion H. 
+    exfalso. eapply nf_s. eapply value_is_nf. 
+      right. apply H2. exists t1'. apply H.
+  Case "ST_IszeroZero". inversion H1.
+    exfalso. eapply nf_s. eapply value_is_nf.
+      right. apply H. exists t1'. apply H2.
+   Case "ST_Iszero". inversion H.
+     exfalso. eapply nf_s. eapply value_is_nf.
+       right. apply H2. exists t1'. apply H.
+Qed.
 (** [] *)
 
 
@@ -242,62 +274,62 @@ Inductive ty : Type :=
   | TNat : ty.
 
 (** In informal notation, the typing relation is often written
-    [|- t \in T], pronounced "[t] has type [T]."  The [|-] symbol is
+    [|- t ∈ T], pronounced "[t] has type [T]."  The [|-] symbol is
     called a "turnstile".  (Below, we're going to see richer typing
     relations where an additional "context" argument is written to the
     left of the turnstile.  Here, the context is always empty.) *)
 (** 
                            ----------------                            (T_True)
-                           |- true \in Bool
+                           |- true ∈ Bool
 
                           -----------------                           (T_False)
-                          |- false \in Bool
+                          |- false ∈ Bool
 
-             |- t1 \in Bool    |- t2 \in T    |- t3 \in T
+             |- t1 ∈ Bool    |- t2 ∈ T    |- t3 ∈ T
              --------------------------------------------                (T_If)
-                    |- if t1 then t2 else t3 \in T
+                    |- if t1 then t2 else t3 ∈ T
 
                              ------------                              (T_Zero)
-                             |- 0 \in Nat
+                             |- 0 ∈ Nat
                               
-                            |- t1 \in Nat
+                            |- t1 ∈ Nat
                           ------------------                           (T_Succ)
-                          |- succ t1 \in Nat
+                          |- succ t1 ∈ Nat
 
-                            |- t1 \in Nat
+                            |- t1 ∈ Nat
                           ------------------                           (T_Pred)
-                          |- pred t1 \in Nat
+                          |- pred t1 ∈ Nat
 
-                            |- t1 \in Nat
+                            |- t1 ∈ Nat
                         ---------------------                        (T_IsZero)
-                        |- iszero t1 \in Bool
+                        |- iszero t1 ∈ Bool
 *)
 
-Reserved Notation "'|-' t '\in' T" (at level 40).
+Reserved Notation "'|-' t '∈' T" (at level 40).
 
 Inductive has_type : tm -> ty -> Prop :=
   | T_True : 
-       |- ttrue \in TBool
+       |- ttrue ∈ TBool
   | T_False : 
-       |- tfalse \in TBool
-  | T_If : forall t1 t2 t3 T,
-       |- t1 \in TBool ->
-       |- t2 \in T ->
-       |- t3 \in T ->
-       |- tif t1 t2 t3 \in T
+       |- tfalse ∈ TBool
+  | T_If : ∀ t1 t2 t3 T,
+       |- t1 ∈ TBool ->
+       |- t2 ∈ T ->
+       |- t3 ∈ T ->
+       |- tif t1 t2 t3 ∈ T
   | T_Zero : 
-       |- tzero \in TNat
-  | T_Succ : forall t1,
-       |- t1 \in TNat ->
-       |- tsucc t1 \in TNat
-  | T_Pred : forall t1,
-       |- t1 \in TNat ->
-       |- tpred t1 \in TNat
-  | T_Iszero : forall t1,
-       |- t1 \in TNat ->
-       |- tiszero t1 \in TBool
+       |- tzero ∈ TNat
+  | T_Succ : ∀ t1,
+       |- t1 ∈ TNat ->
+       |- tsucc t1 ∈ TNat
+  | T_Pred : ∀ t1,
+       |- t1 ∈ TNat ->
+       |- tpred t1 ∈ TNat
+  | T_Iszero : ∀ t1,
+       |- t1 ∈ TNat ->
+       |- tiszero t1 ∈ TBool
 
-where "'|-' t '\in' T" := (has_type t T).
+where "'|-' t '∈' T" := (has_type t T).
 
 Tactic Notation "has_type_cases" tactic(first) ident(c) :=
   first;
@@ -315,30 +347,23 @@ Hint Constructors has_type.
     the type of the normal form of a term. *)
 
 Example has_type_1 : 
-  |- tif tfalse tzero (tsucc tzero) \in TNat.
-Proof. 
-  apply T_If. 
-    apply T_False.
-    apply T_Zero.
-    apply T_Succ.
-      apply T_Zero.  
-Qed.
+  |- tif tfalse tzero (tsucc tzero) ∈ TNat.
+Proof. auto. Qed.
+
 
 (** (Since we've included all the constructors of the typing relation
     in the hint database, the [auto] tactic can actually find this
     proof automatically.) *)
 
 Example has_type_not : 
-  ~ (|- tif tfalse tzero ttrue \in TBool).
-Proof.
-  intros Contra. solve by inversion 2.  Qed.
+  ~ (|- tif tfalse tzero ttrue ∈ TBool).
+Proof. intros Contra. solve by inversion 2. Qed.
 
 (** **** Exercise: 1 star, optional (succ_hastype_nat__hastype_nat) *)
-Example succ_hastype_nat__hastype_nat : forall t,
-  |- tsucc t \in TNat ->
-  |- t \in TNat.  
-Proof.
-  (* FILL IN HERE *) Admitted.
+Example succ_hastype_nat__hastype_nat : ∀ t,
+  |- tsucc t ∈ TNat ->
+  |- t ∈ TNat.  
+Proof. intros. inversion H. assumption. Qed.
 (** [] *)
 
 (* ###################################################################### *)
@@ -348,8 +373,8 @@ Proof.
     the shape of well-typed values.  They say that the definition of value
     and the typing relation agree. *)
 
-Lemma bool_canonical : forall t,
-  |- t \in TBool -> value t -> bvalue t.
+Lemma bool_canonical : ∀ t,
+  |- t ∈ TBool -> value t -> bvalue t.
 Proof.
   intros t HT HV.
   inversion HV; auto.
@@ -357,8 +382,8 @@ Proof.
   induction H; inversion HT; auto.
 Qed.
 
-Lemma nat_canonical : forall t,
-  |- t \in TNat -> value t -> nvalue t.
+Lemma nat_canonical : ∀ t,
+  |- t ∈ TNat -> value t -> nvalue t.
 Proof.
   intros t HT HV.
   inversion HV.
@@ -367,14 +392,15 @@ Proof.
   auto.  
 Qed.
 
+Hint Resolve bool_canonical nat_canonical.
 (* ###################################################################### *)
 (** ** Progress *)
 
 (** The typing relation enjoys two critical properties.  The first is
     that well-typed normal forms are values (i.e., not stuck). *)
 
-Theorem progress : forall t T,
-  |- t \in T ->
+Theorem progress : ∀ t T,
+  |- t ∈ T ->
   value t \/ exists t', t ==> t'.
 
 (** **** Exercise: 3 stars (finish_progress) *)
@@ -397,24 +423,41 @@ Proof with auto.
     SCase "t1 can take a step".
       inversion H as [t1' H1].
       exists (tif t1' t2 t3)...
-  (* FILL IN HERE *) Admitted.
+  Case "T_Succ".
+    inversion IHHT.
+    SCase "value". left. right. constructor...
+    SCase "stepable". inversion H; subst; clear H. right. exists (tsucc x)...
+  Case "T_Pred".
+    inversion IHHT; right.
+     SCase "value". 
+       apply nat_canonical in H... inversion H; subst; clear H.
+         exists tzero...
+         exists t...
+     SCase "stepable". inversion H; subst; clear H. exists (tpred x)...
+  Case "T_Iszero".
+    inversion IHHT; right; 
+    try apply nat_canonical in H; inversion H; subst; clear H...
+      + exists ttrue...
+      + exists tfalse...
+      + exists (tiszero x)...
+Qed.
 (** [] *)
 
 (** **** Exercise: 3 stars, advanced (finish_progress_informal) *)
 (** Complete the corresponding informal proof: *)
 
-(** _Theorem_: If [|- t \in T], then either [t] is a value or else 
+(** _Theorem_: If [|- t ∈ T], then either [t] is a value or else 
     [t ==> t'] for some [t']. *)
 
-(** _Proof_: By induction on a derivation of [|- t \in T].
+(** _Proof_: By induction on a derivation of [|- t ∈ T].
 
       - If the last rule in the derivation is [T_If], then [t = if t1
-        then t2 else t3], with [|- t1 \in Bool], [|- t2 \in T] and [|- t3
-        \in T].  By the IH, either [t1] is a value or else [t1] can step
+        then t2 else t3], with [|- t1 ∈ Bool], [|- t2 ∈ T] and [|- t3
+        ∈ T].  By the IH, either [t1] is a value or else [t1] can step
         to some [t1'].  
 
             - If [t1] is a value, then by the canonical forms lemmas
-              and the fact that [|- t1 \in Bool] we have that [t1] 
+              and the fact that [|- t1 ∈ Bool] we have that [t1] 
               is a [bvalue] -- i.e., it is either [true] or [false].
               If [t1 = true], then [t] steps to [t2] by [ST_IfTrue],
               while if [t1 = false], then [t] steps to [t3] by
@@ -436,14 +479,13 @@ Proof with auto.
 (** **** Exercise: 1 star (step_review) *)
 (** Quick review.  Answer _true_ or _false_.  In this language...
       - Every well-typed normal form is a value.
-
+        - true
       - Every value is a normal form.
-
+        - false
       - The single-step evaluation relation is
         a partial function (i.e., it is deterministic).
 
       - The single-step evaluation relation is a _total_ function.
-
 *)
 (** [] *)
 
@@ -459,10 +501,10 @@ Proof with auto.
     typing statements as sentences, where the term is the subject and
     the type is the predicate. *)
 
-Theorem preservation : forall t t' T,
-  |- t \in T ->
+Theorem preservation : ∀ t t' T,
+  |- t ∈ T ->
   t ==> t' ->
-  |- t' \in T.
+  |- t' ∈ T.
 
 (** **** Exercise: 2 stars (finish_preservation) *)
 (** Complete the formal proof of the [preservation] property.  (Again,
@@ -483,19 +525,25 @@ Proof with auto.
       SCase "ST_IfFalse". assumption.
       SCase "ST_If". apply T_If; try assumption.
         apply IHHT1; assumption.
-    (* FILL IN HERE *) Admitted.
+    Case "T_Succ".
+      inversion HE; subst. apply IHHT in H0...
+    Case "T_Pred".
+      inversion HE; subst...
+      inversion HT...
+      inversion HE; subst...
+Qed.
 (** [] *)
 
 (** **** Exercise: 3 stars, advanced (finish_preservation_informal) *)
 (** Complete the following proof: *)
 
-(** _Theorem_: If [|- t \in T] and [t ==> t'], then [|- t' \in T]. *)
+(** _Theorem_: If [|- t ∈ T] and [t ==> t'], then [|- t' ∈ T]. *)
 
-(** _Proof_: By induction on a derivation of [|- t \in T].
+(** _Proof_: By induction on a derivation of [|- t ∈ T].
 
       - If the last rule in the derivation is [T_If], then [t = if t1
-        then t2 else t3], with [|- t1 \in Bool], [|- t2 \in T] and [|- t3
-        \in T].  
+        then t2 else t3], with [|- t1 ∈ Bool], [|- t2 ∈ T] and [|- t3
+        ∈ T].  
 
         Inspecting the rules for the small-step reduction relation and
         remembering that [t] has the form [if ...], we see that the
@@ -503,15 +551,15 @@ Proof with auto.
         [ST_IfTrue], [ST_IfFalse], or [ST_If].
 
            - If the last rule was [ST_IfTrue], then [t' = t2].  But we
-             know that [|- t2 \in T], so we are done.
+             know that [|- t2 ∈ T], so we are done.
 
            - If the last rule was [ST_IfFalse], then [t' = t3].  But we
-             know that [|- t3 \in T], so we are done.
+             know that [|- t3 ∈ T], so we are done.
 
            - If the last rule was [ST_If], then [t' = if t1' then t2
-             else t3], where [t1 ==> t1'].  We know [|- t1 \in Bool] so,
-             by the IH, [|- t1' \in Bool].  The [T_If] rule then gives us
-             [|- if t1' then t2 else t3 \in T], as required.
+             else t3], where [t1 ==> t1'].  We know [|- t1 ∈ Bool] so,
+             by the IH, [|- t1' ∈ Bool].  The [T_If] rule then gives us
+             [|- if t1' then t2 else t3 ∈ T], as required.
 
     (* FILL IN HERE *)
 []
@@ -525,12 +573,20 @@ Proof with auto.
     each one is doing.  The set-up for this proof is similar, but
     not exactly the same. *)
 
-Theorem preservation' : forall t t' T,
-  |- t \in T ->
+Theorem nvalue_tnat : forall t, nvalue t -> |- t ∈ TNat.
+Proof with auto. intros. induction H... Qed.
+Theorem preservation' : ∀ t t' T,
+  |- t ∈ T ->
   t ==> t' ->
-  |- t' \in T.
+  |- t' ∈ T.
 Proof with eauto.
-  (* FILL IN HERE *) Admitted.
+  intros. generalize dependent T. step_cases (induction H0) Case; intros;
+  inversion H; inversion H0; subst...
+  Case "ST_PredSucc".
+    constructor. apply nvalue_tnat...
+Qed.    
+
+Hint Resolve nvalue_tnat.
 (** [] *)
 
 (* ###################################################################### *)
@@ -542,8 +598,8 @@ Proof with eauto.
 Definition multistep := (multi step).
 Notation "t1 '==>*' t2" := (multistep t1 t2) (at level 40).
 
-Corollary soundness : forall t t' T,
-  |- t \in T -> 
+Corollary soundness : ∀ t t' T,
+  |- t ∈ T -> 
   t ==>* t' ->
   ~(stuck t').
 Proof. 
@@ -650,8 +706,7 @@ Qed.
 Theorem normalize_ex : exists e',
   (AMult (ANum 3) (AMult (ANum 2) (ANum 1))) / empty_state 
   ==>a* e'.
-Proof.
-  (* FILL IN HERE *) Admitted.
+Proof with normalize. eapply ex_intro... Qed.
 
 (** [] *)
 
@@ -661,8 +716,8 @@ Proof.
 Theorem normalize_ex' : exists e',
   (AMult (ANum 3) (AMult (ANum 2) (ANum 1))) / empty_state 
   ==>a* e'.
-Proof.
-  (* FILL IN HERE *) Admitted.
+Proof with normalize. econstructor... Qed.
+
 (** [] *)
 
 
@@ -673,48 +728,46 @@ Proof.
 (** Having seen the subject reduction property, it is reasonable to
     wonder whether the opposity property -- subject _expansion_ --
     also holds.  That is, is it always the case that, if [t ==> t']
-    and [|- t' \in T], then [|- t \in T]?  If so, prove it.  If
+    and [|- t' ∈ T], then [|- t ∈ T]?  If so, prove it.  If
     not, give a counter-example.  (You do not need to prove your
     counter-example in Coq, but feel free to do so if you like.)
 
-    (* FILL IN HERE *)
+    tif ttrue ttrue tzero isn't well typed, but evaluates to a well typed expression
 []
 *)
 
-
-
-
 (** **** Exercise: 2 stars (variation1) *)
 (** Suppose, that we add this new rule to the typing relation: 
-      | T_SuccBool : forall t,
-           |- t \in TBool ->
-           |- tsucc t \in TBool
+      | T_SuccBool : ∀ t,
+           |- t ∈ TBool ->
+           |- tsucc t ∈ TBool
    Which of the following properties remain true in the presence of
    this rule?  For each one, write either "remains true" or
    else "becomes false." If a property becomes false, give a
    counterexample.
       - Determinism of [step]
-
+        - stays
       - Progress
-
+        - nope
       - Preservation
-
+        - stays
 []
 *)
 
 (** **** Exercise: 2 stars (variation2) *)
 (** Suppose, instead, that we add this new rule to the [step] relation: 
-      | ST_Funny1 : forall t2 t3,
+      | ST_Funny1 : ∀ t2 t3,
            (tif ttrue t2 t3) ==> t3
    Which of the above properties become false in the presence of
    this rule?  For each one that does, give a counter-example.
-
+        determinism
+          tif ttrue ttrue tfalse ==> ttrue /\ tif ttrue ttrue tfalse ==> tfalse
 []
 *)
 
 (** **** Exercise: 2 stars, optional (variation3) *)
 (** Suppose instead that we add this rule:
-      | ST_Funny2 : forall t1 t2 t2' t3,
+      | ST_Funny2 : ∀ t1 t2 t2' t3,
            t2 ==> t2' ->
            (tif t1 t2 t3) ==> (tif t1 t2' t3)
    Which of the above properties become false in the presence of
@@ -737,7 +790,7 @@ Proof.
 (** Suppose instead that we add this rule:
    
       | T_Funny4 : 
-            |- tzero \in TBool
+            |- tzero ∈ TBool
    ]]
    Which of the above properties become false in the presence of
    this rule?  For each one that does, give a counter-example.
@@ -749,7 +802,7 @@ Proof.
 (** Suppose instead that we add this rule:
    
       | T_Funny5 : 
-            |- tpred tzero \in TBool
+            |- tpred tzero ∈ TBool
    ]]
    Which of the above properties become false in the presence of
    this rule?  For each one that does, give a counter-example.
@@ -772,9 +825,124 @@ Proof.
     achieve this simply by removing the rule from the definition of
     [step]?  Would doing so create any problems elsewhere? 
 
-(* FILL IN HERE *)
+    Nope, we also need to remove the T_Pred rule from has_type
+    Once we do that though all properties are preserved
+
 [] *)
 
+Module nopredzero.
+
+Reserved Notation "t1 '==>' t2" (at level 40).
+Inductive step : tm -> tm -> Prop :=
+  | ST_IfTrue : Π t1 t2, tif ttrue t1 t2 ==> t1
+  | ST_IfFalse : Π t1 t2, tif tfalse t1 t2 ==> t2
+  | ST_If : Π t1 t1' t2 t3, t1 ==> t1' -> tif t1 t2 t3 ==> tif t1' t2 t3
+  | ST_Succ : Π t1 t1', t1 ==> t1' -> tsucc t1 ==> tsucc t1'
+  | ST_PredSucc : Π t, nvalue t -> tpred (tsucc t) ==> t
+  | ST_Pred : Π t t', t ==> t' -> tpred t ==> tpred t'
+  | ST_IszeroZero : tiszero tzero ==> ttrue
+  | ST_IszeroSucc : Π t, nvalue t -> tiszero (tsucc t) ==> tfalse
+  | ST_Iszero : Π t t', t ==> t' -> tiszero t ==> tiszero t'
+where "t1 '==>' t2" := (step t1 t2).
+
+Tactic Notation "step_cases" tactic(first) ident(c) :=
+  first;
+  [ Case_aux c "ST_IfTrue" | Case_aux c "ST_IfFalse" | Case_aux c "ST_If" 
+  | Case_aux c "ST_Succ"   | Case_aux c "ST_PredSucc" | Case_aux c "ST_Pred" 
+  | Case_aux c "ST_IszeroZero" | Case_aux c "ST_IszeroSucc"
+  | Case_aux c "ST_Iszero" ].
+
+Hint Constructors step.
+
+Reserved Notation "'⊢' t '∈' T" (at level 40).
+
+Inductive has_type : tm -> ty -> Prop :=
+  | T_True : 
+       ⊢ ttrue ∈ TBool
+  | T_False : 
+       ⊢ tfalse ∈ TBool
+  | T_If : ∀ t1 t2 t3 T,
+       ⊢ t1 ∈ TBool ->
+       ⊢ t2 ∈ T ->
+       ⊢ t3 ∈ T ->
+       ⊢ tif t1 t2 t3 ∈ T
+  | T_Zero : 
+       ⊢ tzero ∈ TNat
+  | T_Succ : ∀ t1,
+       ⊢ t1 ∈ TNat ->
+       ⊢ tsucc t1 ∈ TNat
+  | T_Iszero : ∀ t1,
+       ⊢ t1 ∈ TNat ->
+       ⊢ tiszero t1 ∈ TBool
+
+where "'⊢' t '∈' T" := (has_type t T).
+
+Tactic Notation "has_type_cases" tactic(first) ident(c) :=
+  first;
+  [ Case_aux c "T_True" | Case_aux c "T_False" | Case_aux c "T_If"
+  | Case_aux c "T_Zero" | Case_aux c "T_Succ" | Case_aux c "T_Iszero" ].
+
+Hint Constructors has_type.
+
+Theorem progress : Π t T,
+                   ⊢ t ∈ T →
+                   value t \/ ∃ t', t ==> t'.
+Proof with auto.
+  intros. has_type_cases (induction H) Case...
+  Case "T_If". right. inversion IHhas_type1; subst; inversion H2...
+    SCase "value". inversion H3; subst...
+      exists t2...
+      exists t3...
+      solve by inversion 3.
+    SCase "t1 ==> x". exists (tif x t2 t3)...
+  Case "T_Succ". inversion IHhas_type; subst...
+    SCase "value". inversion H0... solve by inversion 3.
+    SCase "stepable". inversion H0. right. exists (tsucc x)...
+  Case "T_Iszero". right. inversion IHhas_type.
+    SCase "value". inversion H0. solve by inversion 3.
+      inversion H1; subst.
+        exists ttrue...
+        exists tfalse...
+    SCase "stepable". inversion H0. exists (tiszero x)...
+Qed.
+
+Theorem value_is_nf : Π t, value t → normal_form step t.
+Proof with auto.
+  intros. destruct H; induction H; intro; try solve by inversion 3...
+  + inversion H0. inversion H1; subst. apply IHnvalue. exists t1'...
+Qed.  
+
+Theorem nf_is_value : Π t T, ⊢ t ∈ T → normal_form step t → value t.
+Proof with auto.
+  intros. destruct (progress t T H)... inversion H1; contradiction.
+Qed.
+
+Lemma tsucc_nf : Π t, nvalue t → Π t', tsucc t ==> t' → False.
+Proof with eauto. 
+  intros. eapply value_is_nf. right... inversion H0; subst. exists t1'...
+Qed.
+
+Theorem step_deterministic : Π t1 t2 t3,
+                             t1 ==> t2 →
+                             t1 ==> t3 →
+                             t2 = t3.
+Proof with eauto. 
+  intros. generalize dependent t3. 
+  step_cases (induction H) Case; intros; 
+  inversion H0; subst; try solve by inversion...
+  Case "ST_If". apply IHstep in H5; subst...
+  Case "ST_Succ". apply IHstep in H2. subst...
+  Case "ST_PredSucc". exfalso. eapply tsucc_nf...
+  Case "ST_Pred".
+    SCase "ST_PredSucc". exfalso. eapply tsucc_nf...
+    SCase "ST_Pred". erewrite IHstep. reflexivity. assumption.
+  Case "ST_IszeroSucc". inversion H0; subst... exfalso. eapply tsucc_nf...
+  Case "ST_Iszero".
+    SCase "ST_IszeroSucc". exfalso. eapply tsucc_nf...
+    SCase "ST_Iszero". erewrite IHstep...
+Qed.
+
+End nopredzero.
 (** **** Exercise: 4 stars, advanced (prog_pres_bigstep) *)
 (** Suppose our evaluation relation is defined in the big-step style.
     What are the appropriate analogs of the progress and preservation
