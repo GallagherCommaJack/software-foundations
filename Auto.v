@@ -531,7 +531,7 @@ Proof.
        find_rwinv.
        (* oops: why didn't [find_rwinv] solve this for us already? 
           answer: we did things in the wrong order. *)
-  case "E_RepeatLoop".
+  Case "E_RepeatLoop".
      SCase "b evaluates to true (contradiction)".
         find_rwinv.
 Qed.
