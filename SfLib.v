@@ -300,3 +300,21 @@ Proof. intros; induction l1.
          simpl. rewrite IHl1. reflexivity.
 Qed.
 
+
+Notation "x ↔ y" := (x <-> y) (at level 95, no associativity): type_scope.
+
+Notation "¬ x" := (~x) (at level 75, right associativity) : type_scope.
+
+Notation "x <> y" := (¬ x = y) (at level 70) : type_scope.
+Notation "x ≠ y" := (x <> y) (at level 70) : type_scope.
+
+Notation "∀ x .. y , P" := (forall x, .. (forall y, P) ..)
+  (at level 200, x binder, y binder, right associativity) : type_scope.
+
+Notation "∃ x .. y , P" := (exists x, .. (exists y, P) ..)
+  (at level 200, x binder, y binder, right associativity) : type_scope.
+
+Notation "'Π' x .. y , P" := (forall x, .. (forall y, P) ..)
+  (at level 200, x binder, y binder, right associativity) : type_scope.
+
+Notation "A → B" := (forall (_ : A) , B) (at level 99, right associativity).
