@@ -176,9 +176,6 @@ Tactic Notation "t_cases" tactic(first) ident(c) :=
 
 (** Some examples... *)
 
-Notation "'λ' x ':' T , e" := (tabs x T e)
-  (at level 200, right associativity) : tm_scope.
-
 Definition x := (Id 0).
 Definition y := (Id 1).
 Definition z := (Id 2).
@@ -388,16 +385,65 @@ where "'[' x ':=' s ']' t" := (subst x s t).
     constructors. *)
 
 Inductive substi (s:tm) (x:id) : tm -> tm -> Prop := 
-  | s_var1 : substi s x (tvar x) s
-  (* FILL IN HERE *)
+| s_var1 : substi s x (tvar x) s
+| s_var2 : forall y, y <> x -> substi s x (tvar y) (tvar y)
+
+| s_abs1 : forall T tm, substi s x (tabs x T tm) (tabs x T tm)
+
+| s_abs2 : forall y T tm tm', x <> y -> substi s x tm tm' ->
+                         substi s x (tabs y T tm) (tabs y T tm')                         
+
+| s_app : forall t1 t1' t2 t2',
+            substi s x t1 t1' -> substi s x t2 t2' ->
+            substi s x (tapp t1 t2) (tapp t1' t2')
+                   
+| s_true : substi s x ttrue ttrue
+| s_false : substi s x tfalse tfalse
+| s_if : forall t1 t1' t2 t2' t3 t3',
+           substi s x t1 t1' -> substi s x t2 t2' -> substi s x t3 t3' ->
+           substi s x (tif t1 t2 t3) (tif t1' t2' t3')
 .
 
 Hint Constructors substi.
 
+Theorem eq_ty_dec : forall (t1 t2 : ty), {t1 = t2} + {t1 <> t2}.
+Proof. induction t1; destruct t2; try (right; intro; inversion H; fail).
+       + left. reflexivity.
+       + destruct (IHt1_1 t2_1), (IHt1_2 t2_2);
+         try (left; induction e; induction e0; reflexivity);
+         try (right; intro; inversion H; contradiction).
+Qed.
+
+Theorem eq_tm_dec : forall (t1 t2 : tm), {t1 = t2} + {t1 <> t2}.
+Proof. induction t1; destruct t2;
+       try (left; auto; fail); try (right; intro; inversion H; fail);
+       try(
+           try destruct (IHt1_1 t2_1), (IHt1_2 t2_2); try destruct (IHt1_3 t2_3);
+           try (left; induction e; try induction e0; try induction e1; reflexivity);
+           right; intro; inversion H; contradiction
+         ).
+       + destruct (eq_id_dec i i0).
+         - left. induction e. reflexivity.
+         - right. intro. inversion H. contradiction.
+       + destruct (eq_id_dec i i0), (eq_ty_dec t t0), (IHt1 t2);
+         try (left; induction e; induction e0; induction e1; reflexivity);
+         try (right; intro; inversion H; contradiction).
+Qed.
+
 Theorem substi_correct : forall s x t t',
   [x:=s]t = t' <-> substi s x t t'.
-Proof.
-  (* FILL IN HERE *) Admitted.
+Proof with auto.
+  split; intros.
+  + generalize dependent t'; induction t; intros; simpl in *;
+    try (destruct (eq_id_dec x0 i)); try (induction e, H); 
+    try (destruct t'; inversion H; subst)...
+  + induction H; simpl;
+    try rewrite eq_id;
+    try destruct (eq_id_dec x0 y0); try induction IHsubsti;
+    try induction IHsubsti1; try induction IHsubsti2; try induction IHsubsti3...
+    - symmetry in e. contradiction.
+    - contradiction.
+Qed.
 (** [] *)
 
 (* ################################### *)
@@ -488,8 +534,8 @@ Proof.
   eapply multi_step.
     apply ST_AppAbs.
     apply v_abs.
-  simpl.
-  apply multi_refl.  Qed.  
+  simpl. apply multi_refl.
+Qed.  
 
 (** Example:
 ((λx:Bool->Bool. x) ((λx:Bool->Bool. x) (λx:Bool. x))) 
@@ -706,8 +752,7 @@ Hint Constructors has_type.
 
 Example typing_example_1 :
   empty |- tabs x TBool (tvar x) ∈ TArrow TBool TBool.
-Proof.
-  apply T_Abs. apply T_Var. reflexivity.  Qed.
+Proof. apply T_Abs. apply T_Var. reflexivity.  Qed.
 
 (** Note that since we added the [has_type] constructors to the hints
     database, auto can actually solve this one immediately. *)
@@ -728,8 +773,7 @@ Example typing_example_2 :
           (tapp (tvar y) (tapp (tvar y) (tvar x))))) ∈
     (TArrow TBool (TArrow (TArrow TBool TBool) TBool)).
 Proof with auto using extend_eq.
-  apply T_Abs.
-  apply T_Abs.
+  repeat apply T_Abs.
   eapply T_App. apply T_Var...
   eapply T_App. apply T_Var...
   apply T_Var...
@@ -746,8 +790,14 @@ Example typing_example_2_full :
           (tapp (tvar y) (tapp (tvar y) (tvar x))))) ∈
     (TArrow TBool (TArrow (TArrow TBool TBool) TBool)).
 Proof.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
+  repeat apply T_Abs.
+  apply T_App with (T11 := TBool).
+    apply T_Var. unfold extend. rewrite eq_id. reflexivity.
+  apply T_App with (T11 := TBool).
+    apply T_Var. unfold extend. rewrite eq_id. reflexivity.
+  apply T_Var. reflexivity.
+Qed.
+  (** [] *)
 
 (** **** Exercise: 2 stars (typing_example_3) *)
 (** Formally prove the following typing derivation holds: *)
@@ -766,7 +816,11 @@ Example typing_example_3 :
                (tapp (tvar y) (tapp (tvar x) (tvar z)))))) ∈
       T.
 Proof with auto.
-  (* FILL IN HERE *) Admitted.
+  exists (TArrow (TArrow TBool TBool)
+            (TArrow (TArrow TBool TBool)
+                    (TArrow TBool TBool))).  
+  repeat econstructor.
+Qed.
 (** [] *)
 
 (** We can also show that terms are _not_ typable.  For example, let's
@@ -808,11 +862,14 @@ Example typing_nonexample_3 :
              (tapp (tvar x) (tvar x))) ∈
           T).
 Proof.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
-
-
-
+  intro Hc. inversion Hc.
+  inversion H; subst; clear H.
+  inversion H0; subst; clear H0.
+  inversion H5; subst; clear H5.
+  inversion H2; inversion H4; subst; clear H2; clear H4.
+  inversion H1; inversion H7; subst; clear H1; clear H7.
+  induction T11; inversion H2. induction H1. apply IHT11_1. apply H0.
+Qed.
 End STLC.
 
 (* $Date: 2013-11-20 13:03:49 -0500 (Wed, 20 Nov 2013) $ *)
