@@ -1,9 +1,7 @@
 (** * Equiv: Program Equivalence *)
 
 
-
 Require Export Imp.
-
 (** *** Some general advice for working on exercises:
 
     - Most of the Coq proofs we ask you to do are similar to proofs
@@ -469,7 +467,7 @@ Qed.
     is equivalent to [SKIP].  However, when we try to show it, we get
     stuck in an interesting way. *)
 
-Theorem identity_assignment_first_try : forall (X:id),
+Theorem identity_assignment_first_try : forall X,
   cequiv (X ::= AId X) SKIP.
 Proof. 
    intros. split; intro H.
@@ -530,7 +528,7 @@ Axiom functional_extensionality : forall {X Y: Type} {f g : X -> Y},
 
 (** With the benefit of this axiom we can prove our theorem.  *)
 
-Theorem identity_assignment : forall (X:id),
+Theorem identity_assignment : forall X,
   cequiv
     (X ::= AId X)
     SKIP.
@@ -1310,7 +1308,7 @@ Proof. unfold aequiv; intros.
        simpl;
        try destruct n; try destruct n0;
        try rewrite oa1; try rewrite oa2;
-       try rewrite IHa1; try rewrite IHa2;
+       try rewrite IHa1; try rewrite IHa2; simpl;
        try rewrite Nat.sub_0_r; try rewrite Nat.mul_0_r;
        auto.
 Qed.
