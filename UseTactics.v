@@ -246,11 +246,7 @@ Proof.
 
   (* The new proof, alternative: *)
   intros C. destruct C.
-  inverts H as H.
-  inverts H as H.
-  inverts H as H.
-  inverts H as H.
-  inverts H.
+  repeat (inverts H as H).
 Qed.
 
 End InvertsExamples.
