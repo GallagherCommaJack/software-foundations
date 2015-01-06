@@ -563,6 +563,13 @@ Proof with eauto.
       inversion HT1...  
 Qed.
 
+Lemma multipreservation : forall t t' T,
+                            empty |- t ∈ T -> t ==>* t' -> empty |- t' ∈ T.
+Proof. intros. induction H0; intros; auto.
+       apply IHmulti. eapply preservation with (t := x0); assumption.
+Qed.       
+                            
+
 (** **** Exercise: 2 stars (subject_expansion_stlc) *)
 (** An exercise in the [Types] chapter asked about the subject
     expansion property for the simple language of arithmetic and
@@ -571,7 +578,7 @@ Qed.
     then [empty |- t ∈ T]?  If so, prove it.  If not, give a
     counter-example not involving conditionals.
 
-(* FILL IN HERE *)
+(* Hmm... types can depend on contexts, but I'm not sure this is false *)
 []
 *)
 
@@ -591,11 +598,19 @@ Corollary soundness : forall t t' T,
   empty |- t ∈ T -> 
   t ==>* t' ->
   ~(stuck t').
-Proof.
+Proof with eauto.
   intros t t' T Hhas_type Hmulti. unfold stuck.
   intros [Hnf Hnot_val]. unfold normal_form in Hnf.
   induction Hmulti.
-  (* FILL IN HERE *) Admitted.
+  { assert (value x0 \/ exists t', x0 ==> t'). { eapply progress... }
+    { destruct H; contradiction. } }
+  { assert (value z0 \/ exists t', z0 ==> t'). {eapply progress. eapply multipreservation...}
+    { destruct H0; contradiction. } }
+Qed.
+      
+    
+    
+    
 
 (* ###################################################################### *)
 (** * Uniqueness of Types *)
@@ -606,7 +621,17 @@ Proof.
     type. *)
 (** Formalize this statement and prove it. *)
 
-(* FILL IN HERE *)
+Theorem unique : forall t Gamma T T', Gamma |- t ∈ T -> Gamma |- t ∈ T' -> T = T'.
+Proof with eauto.
+  introv Ht1 Ht2. generalize dependent T'.
+  has_type_cases (induction Ht1) Case; intros; inverts Ht2...
+  { Case "T_Var". symmetry in H, H2. induction H. inverts H2... }
+  { Case "T_Abs". apply (f_equal (TArrow T11)). apply IHHt1... }
+  { Case "T_App". apply IHHt1_1 in H2. inverts H2... }
+Qed.
+                  
+
+    
 (** [] *)
 
 (* ###################################################################### *)
@@ -617,7 +642,32 @@ Proof.
     theorems for the simply typed lambda-calculus. *)
 (** [] *)
 
+Definition app : forall {A} (a : A) {P : A -> Type}, (forall a, P a) -> P a. auto. Defined.
 
+Theorem progress'' : forall t T, empty |- t ∈ T -> value t \/ exists t', t ==> t'.
+Proof with eauto.
+  introv Ht. remember (@empty ty). symmetry in Heqp.
+  has_type_cases (induction Ht) Case; induction Heqp;
+  try apply (app eq_refl) in IHHt1; try apply (app eq_refl) in IHHt2;
+  try apply (app eq_refl) in IHHt3; simpl in *...
+  { Case "T_Var". inverts H. }
+  { Case "T_App". right.
+    inverts IHHt1.
+    { inverts IHHt2.
+      { inverts H; inverts Ht1. exists ([x0 := t2] t)... }
+      { inverts H0. exists (tapp t1 x0)... } }
+    { inverts H. exists (tapp x0 t2)... } }
+  { Case "T_If". simpl in *. right.
+    inverts IHHt1; inverts H; inverts Ht1... }
+Qed.
+
+Theorem  preservation'' : forall t t' T, empty |- t ∈ T -> t ==> t' -> empty |- t' ∈ T.
+Proof with eauto.
+  introv Ht eval. generalize dependent t'. remember (@empty ty). symmetry in Heqp.
+  has_type_cases (induction Ht) Case; intros; subst; inverts eval; inverts Ht1...
+  Case "T_App". eapply (substitution_preserves_typing). apply H1. apply Ht2.
+Qed.
+    
 (** **** Exercise: 2 stars (stlc_variation1) *)
 (** Suppose we add a new term [zap] with the following reduction rule:
                          ---------                  (ST_Zap)
@@ -631,11 +681,12 @@ and the following typing rule:
     false, give a counterexample.
 
       - Determinism of [step]
-
+        False, forall t1 t2, tapp t1 t2 ==> zap
       - Progress
-
+        Trivially true, forall t, exists t', t ==> t'
+        Proof: just take zap to be t', ST_Zap : t ==> zap
       - Preservation
-
+        False, forall t : T1, forall T2, t : T1 ==> zap : T2
 []
 *)
 
@@ -652,11 +703,11 @@ and the following typing rule:
     false, give a counterexample.
 
       - Determinism of [step]
-
+        true, same proof, but \x : A. x isn't a value anymore
       - Progress
-
+        true
       - Preservation
-
+        false, (\x : A. x) : A -> A ==> foo ==> true : TBool
 []
 *)
 
@@ -668,11 +719,14 @@ and the following typing rule:
     false, give a counterexample.
 
       - Determinism of [step]
-
+        true
       - Progress
-
+        false, but could be made true if you removed the value requirement on ST_App2
+        Example:
+          t1 t2 t3 : tm
+          tapp (tapp t1 t2) t3 no longer evaluates
       - Preservation
-
+        true
 []
 *)
 
@@ -686,11 +740,11 @@ and the following typing rule:
     false, give a counterexample.
 
       - Determinism of [step]
-
+        false, if true then false else false ==> true and if true then false else false ==> false
       - Progress
-
+        true
       - Preservation
-
+        false, if true then (\a : A. A) else false : A -> A ==> true : Bool
 *)
 
 (** **** Exercise: 2 stars, optional (stlc_variation5) *)
@@ -749,9 +803,6 @@ and the following typing rule:
 
 []
 *)
-
-End STLCProp.
-
 (* ###################################################################### *)
 (* ###################################################################### *)
 (** ** Exercise: STLC with Arithmetic *) 
@@ -805,10 +856,9 @@ Tactic Notation "t_cases" tactic(first) ident(c) :=
       the original STLC to deal with the new syntactic forms.  Make
       sure Coq accepts the whole file. *)
 
-(* FILL IN HERE *)
-(** [] *)
-
+(* I could do all of these if it had originally been defined that way, 
+   but this messiness with modules was giving me way too many scoping errors with notation, 
+   not worth the trouble *)
 End STLCArith.
 
-(* $Date: 2014-04-23 09:37:37 -0400 (Wed, 23 Apr 2014) $ *)
-
+End STLCProp.
