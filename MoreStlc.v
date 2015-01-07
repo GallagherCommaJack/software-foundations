@@ -1189,82 +1189,82 @@ Definition context := partial_map ty.
 (** Next we define the typing rules.  These are nearly direct
     transcriptions of the inference rules shown above. *)
 
-Reserved Notation "Gamma '|-' t '\in' T" (at level 40).
+Reserved Notation "Gamma '|-' t '∈' T" (at level 40).
 
 Inductive has_type : context -> tm -> ty -> Prop :=
   (* Typing rules for proper terms *)
   | T_Var : forall Gamma x T,
       Gamma x = Some T ->
-      Gamma |- (tvar x) \in T
+      Gamma |- (tvar x) ∈ T
   | T_Abs : forall Gamma x T11 T12 t12,
-      (extend Gamma x T11) |- t12 \in T12 -> 
-      Gamma |- (tabs x T11 t12) \in (TArrow T11 T12)
+      (extend Gamma x T11) |- t12 ∈ T12 -> 
+      Gamma |- (tabs x T11 t12) ∈ (TArrow T11 T12)
   | T_App : forall T1 T2 Gamma t1 t2,
-      Gamma |- t1 \in (TArrow T1 T2) -> 
-      Gamma |- t2 \in T1 -> 
-      Gamma |- (tapp t1 t2) \in T2
+      Gamma |- t1 ∈ (TArrow T1 T2) -> 
+      Gamma |- t2 ∈ T1 -> 
+      Gamma |- (tapp t1 t2) ∈ T2
   (* nats *)
   | T_Nat : forall Gamma n1,
-      Gamma |- (tnat n1) \in TNat
+      Gamma |- (tnat n1) ∈ TNat
   | T_Succ : forall Gamma t1,
-      Gamma |- t1 \in TNat ->
-      Gamma |- (tsucc t1) \in TNat
+      Gamma |- t1 ∈ TNat ->
+      Gamma |- (tsucc t1) ∈ TNat
   | T_Pred : forall Gamma t1,
-      Gamma |- t1 \in TNat ->
-      Gamma |- (tpred t1) \in TNat
+      Gamma |- t1 ∈ TNat ->
+      Gamma |- (tpred t1) ∈ TNat
   | T_Mult : forall Gamma t1 t2,
-      Gamma |- t1 \in TNat ->
-      Gamma |- t2 \in TNat ->
-      Gamma |- (tmult t1 t2) \in TNat
+      Gamma |- t1 ∈ TNat ->
+      Gamma |- t2 ∈ TNat ->
+      Gamma |- (tmult t1 t2) ∈ TNat
   | T_If0 : forall Gamma t1 t2 t3 T1,
-      Gamma |- t1 \in TNat ->
-      Gamma |- t2 \in T1 ->
-      Gamma |- t3 \in T1 ->
-      Gamma |- (tif0 t1 t2 t3) \in T1
+      Gamma |- t1 ∈ TNat ->
+      Gamma |- t2 ∈ T1 ->
+      Gamma |- t3 ∈ T1 ->
+      Gamma |- (tif0 t1 t2 t3) ∈ T1
   (* pairs *)
   | T_Pair : forall Gamma t1 t2 T1 T2,
-      Gamma |- t1 \in T1 ->
-      Gamma |- t2 \in T2 ->
-      Gamma |- (tpair t1 t2) \in (TProd T1 T2)
+      Gamma |- t1 ∈ T1 ->
+      Gamma |- t2 ∈ T2 ->
+      Gamma |- (tpair t1 t2) ∈ (TProd T1 T2)
   | T_Fst : forall Gamma t T1 T2,
-      Gamma |- t \in (TProd T1 T2) ->
-      Gamma |- (tfst t) \in T1
+      Gamma |- t ∈ (TProd T1 T2) ->
+      Gamma |- (tfst t) ∈ T1
   | T_Snd : forall Gamma t T1 T2,
-      Gamma |- t \in (TProd T1 T2) ->
-      Gamma |- (tsnd t) \in T2
+      Gamma |- t ∈ (TProd T1 T2) ->
+      Gamma |- (tsnd t) ∈ T2
   (* unit *)
   | T_Unit : forall Gamma,
-      Gamma |- tunit \in TUnit
+      Gamma |- tunit ∈ TUnit
   (* let *)
 (* FILL IN HERE *)
   (* sums *)
   | T_Inl : forall Gamma t1 T1 T2,
-      Gamma |- t1 \in T1 ->
-      Gamma |- (tinl T2 t1) \in (TSum T1 T2)
+      Gamma |- t1 ∈ T1 ->
+      Gamma |- (tinl T2 t1) ∈ (TSum T1 T2)
   | T_Inr : forall Gamma t2 T1 T2,
-      Gamma |- t2 \in T2 ->
-      Gamma |- (tinr T1 t2) \in (TSum T1 T2)
+      Gamma |- t2 ∈ T2 ->
+      Gamma |- (tinr T1 t2) ∈ (TSum T1 T2)
   | T_Case : forall Gamma t0 x1 T1 t1 x2 T2 t2 T,
-      Gamma |- t0 \in (TSum T1 T2) -> 
-      (extend Gamma x1 T1) |- t1 \in T ->
-      (extend Gamma x2 T2) |- t2 \in T -> 
-      Gamma |- (tcase t0 x1 t1 x2 t2) \in T
+      Gamma |- t0 ∈ (TSum T1 T2) -> 
+      (extend Gamma x1 T1) |- t1 ∈ T ->
+      (extend Gamma x2 T2) |- t2 ∈ T -> 
+      Gamma |- (tcase t0 x1 t1 x2 t2) ∈ T
   (* lists *)
   | T_Nil : forall Gamma T,
-      Gamma |- (tnil T) \in (TList T)
+      Gamma |- (tnil T) ∈ (TList T)
   | T_Cons : forall Gamma t1 t2 T1,
-      Gamma |- t1 \in T1 ->
-      Gamma |- t2 \in (TList T1) ->
-      Gamma |- (tcons t1 t2) \in (TList T1)
+      Gamma |- t1 ∈ T1 ->
+      Gamma |- t2 ∈ (TList T1) ->
+      Gamma |- (tcons t1 t2) ∈ (TList T1)
   | T_Lcase : forall Gamma t1 T1 t2 x1 x2 t3 T2,
-      Gamma |- t1 \in (TList T1) ->
-      Gamma |- t2 \in T2 ->
-      (extend (extend Gamma x2 (TList T1)) x1 T1) |- t3 \in T2 ->
-      Gamma |- (tlcase t1 t2 x1 x2 t3) \in T2
+      Gamma |- t1 ∈ (TList T1) ->
+      Gamma |- t2 ∈ T2 ->
+      (extend (extend Gamma x2 (TList T1)) x1 T1) |- t3 ∈ T2 ->
+      Gamma |- (tlcase t1 t2 x1 x2 t3) ∈ T2
   (* fix *)
 (* FILL IN HERE *)
 
-where "Gamma '|-' t '\in' T" := (has_type Gamma t T).
+where "Gamma '|-' t '∈' T" := (has_type Gamma t T).
 
 Hint Constructors has_type.
 
@@ -1326,7 +1326,7 @@ Notation eo := (Id 18).
     [auto].
 
     The following [Hint] declarations say that, whenever [auto]
-    arrives at a goal of the form [(Gamma |- (tapp e1 e1) \in T)], it
+    arrives at a goal of the form [(Gamma |- (tapp e1 e1) ∈ T)], it
     should consider [eapply T_App], leaving an existential variable
     for the middle type T1, and similar for [lcase]. That variable
     will then be filled in during the search for type derivations for
@@ -1366,7 +1366,7 @@ Definition test :=
 
 (* 
 Example typechecks :
-  (@empty ty) |- test \in TNat.
+  (@empty ty) |- test ∈ TNat.
 Proof.
   unfold test.
   (* This typing derivation is quite deep, so we need to increase the
@@ -1399,7 +1399,7 @@ Definition test :=
 
 (* 
 Example typechecks :
-  (@empty ty) |- test \in TNat.
+  (@empty ty) |- test ∈ TNat.
 Proof. unfold test. eauto 15. Qed.
 
 Example reduces :
@@ -1422,7 +1422,7 @@ Definition test :=
 
 (* 
 Example typechecks :
-  (@empty ty) |- test \in TNat.
+  (@empty ty) |- test ∈ TNat.
 Proof. unfold test. eauto 15. Qed.
 
 Example reduces :
@@ -1447,7 +1447,7 @@ Definition test :=
 
 (* 
 Example typechecks :
-  (@empty ty) |- test \in TNat.
+  (@empty ty) |- test ∈ TNat.
 Proof. unfold test. eauto 15. Qed.
 
 Example reduces :
@@ -1479,7 +1479,7 @@ Definition test :=
 
 (* 
 Example typechecks :
-  (@empty ty) |- test \in (TProd TNat TNat).
+  (@empty ty) |- test ∈ (TProd TNat TNat).
 Proof. unfold test. eauto 15. Qed.
 
 Example reduces :
@@ -1507,7 +1507,7 @@ Definition test :=
 
 (* 
 Example typechecks :
-  (@empty ty) |- test \in TNat.
+  (@empty ty) |- test ∈ TNat.
 Proof. unfold test. eauto 20. Qed.
 
 Example reduces :
@@ -1541,7 +1541,7 @@ Definition fact :=
 
 (* 
 Example fact_typechecks :
-  (@empty ty) |- fact \in (TArrow TNat TNat).
+  (@empty ty) |- fact ∈ (TArrow TNat TNat).
 Proof. unfold fact. auto 10. 
 Qed.
 *)
@@ -1577,7 +1577,7 @@ Definition map :=
 (* 
 (* Make sure you've uncommented the last [Hint Extern] above... *)
 Example map_typechecks :
-  empty |- map \in 
+  empty |- map ∈ 
     (TArrow (TArrow TNat TNat)
       (TArrow (TList TNat) 
         (TList TNat))).
@@ -1617,7 +1617,7 @@ Definition equal :=
 
 (* 
 Example equal_typechecks :
-  (@empty ty) |- equal \in (TArrow TNat (TArrow TNat TNat)).
+  (@empty ty) |- equal ∈ (TArrow TNat (TArrow TNat TNat)).
 Proof. unfold equal. auto 10. 
 Qed.
 *)
@@ -1670,7 +1670,7 @@ Definition eotest :=
 
 (* 
 Example eotest_typechecks :
-  (@empty ty) |- eotest \in (TProd TNat TNat).
+  (@empty ty) |- eotest ∈ (TProd TNat TNat).
 Proof. unfold eotest. eauto 30. 
 Qed.
 *)
@@ -1696,7 +1696,7 @@ End Examples.
 (** *** Progress *)
 
 Theorem progress : forall t T, 
-     empty |- t \in T ->
+     empty |- t ∈ T ->
      value t \/ exists t', t ==> t'. 
 Proof with eauto.
   (* Theorem: Suppose empty |- t : T.  Then either
@@ -1965,9 +1965,9 @@ Inductive appears_free_in : id -> tm -> Prop :=
 Hint Constructors appears_free_in.
 
 Lemma context_invariance : forall Gamma Gamma' t S,
-     Gamma |- t \in S  ->
+     Gamma |- t ∈ S  ->
      (forall x, appears_free_in x t -> Gamma x = Gamma' x)  ->
-     Gamma' |- t \in S.
+     Gamma' |- t ∈ S.
 Proof with eauto.
   intros. generalize dependent Gamma'.
   has_type_cases (induction H) Case; 
@@ -2005,7 +2005,7 @@ Qed.
 
 Lemma free_in_context : forall x t T Gamma,
    appears_free_in x t ->
-   Gamma |- t \in T ->
+   Gamma |- t ∈ T ->
    exists T', Gamma x = Some T'.
 Proof with eauto.
   intros x t T Gamma Hafi Htyp.
@@ -2036,9 +2036,9 @@ Qed.
 (** *** Substitution *)
 
 Lemma substitution_preserves_typing : forall Gamma x U v t S,
-     (extend Gamma x U) |- t \in S  ->
-     empty |- v \in U   ->
-     Gamma |- ([x:=v]t) \in S.
+     (extend Gamma x U) |- t ∈ S  ->
+     empty |- v ∈ U   ->
+     Gamma |- ([x:=v]t) ∈ S.
 Proof with eauto.
   (* Theorem: If Gamma,x:U |- t : S and empty |- v : U, then 
      Gamma |- [x:=v]t : S. *)
@@ -2171,9 +2171,9 @@ Qed.
 (** *** Preservation *)
 
 Theorem preservation : forall t t' T,
-     empty |- t \in T  ->
+     empty |- t ∈ T  ->
      t ==> t'  ->
-     empty |- t' \in T.
+     empty |- t' ∈ T.
 Proof with eauto.
   intros t t' T HT.
   (* Theorem: If [empty |- t : T] and [t ==> t'], then [empty |- t' : T]. *)
