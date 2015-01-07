@@ -1,6 +1,7 @@
 (** * MoreStlc: More on the Simply Typed Lambda-Calculus *)
 
 Require Export Stlc. 
+Require Export LibTactics.
 
 (* ###################################################################### *)
 (** * Simple Extensions to STLC *)
@@ -611,7 +612,9 @@ if 3=0 then 1 else 3 * (fix F (pred 3))
         else if (pred x)=0 then 0
         else 1 + (halve (pred (pred x))))
 >>
-(* FILL IN HERE *)
+(* 
+flip = λ f. λ x. λ y. f y x
+halve = λ n. flip fix n λ f. λ x. if x=0 then 0 else if (pred x)=0 then 0 else 1 + f (pred (pred x)) *)
 []
 *)
 
@@ -994,7 +997,7 @@ Fixpoint subst (x:id) (s:tm) (t:tm) : tm :=
   | tsnd t1 => 
       tsnd (subst x s t1)
   | tunit => tunit
-  (* FILL IN HERE *)
+  | tlet i v e => tlet i (subst x s v) (if eq_id_dec x i then e else subst x s e)
   | tinl T t1 => 
       tinl T (subst x s t1)
   | tinr T t1 => 
@@ -1013,8 +1016,7 @@ Fixpoint subst (x:id) (s:tm) (t:tm) : tm :=
            t3 
          else if eq_id_dec x y2 then t3 
               else (subst x s t3))
-(* FILL IN HERE *)
-  | _ => t  (* ... and delete this line *) 
+  | tfix t => tfix (subst x s t)
   end.
 
 Notation "'[' x ':=' s ']' t" := (subst x s t) (at level 20).
@@ -1118,7 +1120,12 @@ Inductive step : tm -> tm -> Prop :=
         value v2 ->
         (tsnd (tpair v1 v2)) ==> v2
   (* let *)
-  (* FILL IN HERE *)
+  | ST_Let1 : forall x t1 t1' t2,
+                t1 ==> t1' ->
+                tlet x t1 t2 ==> tlet x t1' t2
+  | ST_LetValue : forall x t1 t2,
+                    value t1 ->
+                    tlet x t1 t2 ==> [x := t1] t2
   (* sums *)
   | ST_Inl : forall t1 t1' T,
         t1 ==> t1' ->
@@ -1153,8 +1160,8 @@ Inductive step : tm -> tm -> Prop :=
        value vl  ->
        (tlcase (tcons v1 vl) t2 x1 x2 t3) ==> (subst x2 vl (subst x1 v1 t3))
   (* fix *)
-(* FILL IN HERE *)
-
+  | ST_Fix1 : forall t t', t ==> t' -> tfix t ==> tfix t'
+  | ST_FixAbs : forall xf T t, tfix (tabs xf T t) ==> [xf := tfix (tabs xf T t)] t
 where "t1 '==>' t2" := (step t1 t2).
 
 Tactic Notation "step_cases" tactic(first) ident(c) :=
@@ -1168,12 +1175,12 @@ Tactic Notation "step_cases" tactic(first) ident(c) :=
   | Case_aux c "ST_Pair1" | Case_aux c "ST_Pair2"
     | Case_aux c "ST_Fst1" | Case_aux c "ST_FstPair"
     | Case_aux c "ST_Snd1" | Case_aux c "ST_SndPair"
-    (* FILL IN HERE *)
+  | Case_aux c "ST_Let1" | Case_aux c "ST_LetValue"
   | Case_aux c "ST_Inl" | Case_aux c "ST_Inr" | Case_aux c "ST_Case"
     | Case_aux c "ST_CaseInl" | Case_aux c "ST_CaseInr"
   | Case_aux c "ST_Cons1" | Case_aux c "ST_Cons2" | Case_aux c "ST_Lcase1"
     | Case_aux c "ST_LcaseNil" | Case_aux c "ST_LcaseCons"
-(* FILL IN HERE *)
+  | Case_aux c "ST_Fix1" | Case_aux c "ST_FixAbs"
   ].
 
 Notation multistep := (multi step).
@@ -1236,7 +1243,9 @@ Inductive has_type : context -> tm -> ty -> Prop :=
   | T_Unit : forall Gamma,
       Gamma |- tunit ∈ TUnit
   (* let *)
-(* FILL IN HERE *)
+  | T_Let : forall Gamma x v Tx T t,
+              Gamma |- v ∈ Tx -> (extend Gamma x Tx) |- t ∈ T ->
+              Gamma |- tlet x v t ∈ T
   (* sums *)
   | T_Inl : forall Gamma t1 T1 T2,
       Gamma |- t1 ∈ T1 ->
@@ -1262,7 +1271,7 @@ Inductive has_type : context -> tm -> ty -> Prop :=
       (extend (extend Gamma x2 (TList T1)) x1 T1) |- t3 ∈ T2 ->
       Gamma |- (tlcase t1 t2 x1 x2 t3) ∈ T2
   (* fix *)
-(* FILL IN HERE *)
+  | T_Fix : forall Gamma t T, Gamma |- t ∈ (TArrow T T) -> Gamma |- tfix t ∈ T
 
 where "Gamma '|-' t '∈' T" := (has_type Gamma t T).
 
@@ -1276,11 +1285,11 @@ Tactic Notation "has_type_cases" tactic(first) ident(c) :=
   | Case_aux c "T_Pair" | Case_aux c "T_Fst" | Case_aux c "T_Snd"
   | Case_aux c "T_Unit" 
 (* let *)
-(* FILL IN HERE *)
+  | Case_aux c "T_Let"
   | Case_aux c "T_Inl" | Case_aux c "T_Inr" | Case_aux c "T_Case"
   | Case_aux c "T_Nil" | Case_aux c "T_Cons" | Case_aux c "T_Lcase" 
 (* fix *)
-(* FILL IN HERE *)
+  | Case_aux c "T_Fix"
 ].
 
 (* ###################################################################### *)
@@ -1336,13 +1345,10 @@ Notation eo := (Id 18).
 
 Hint Extern 2 (has_type _ (tapp _ _) _) => 
   eapply T_App; auto.
-(* You'll want to uncomment the following line once 
-   you've defined the [T_Lcase] constructor for the typing
-   relation: *)
-(* 
+
 Hint Extern 2 (has_type _ (tlcase _ _ _ _ _) _) => 
   eapply T_Lcase; auto.
-*)
+
 Hint Extern 2 (_ = _) => compute; reflexivity.
 
 (** *** Numbers *)
@@ -1364,7 +1370,7 @@ Definition test :=
 (** Remove the comment braces once you've implemented enough of the
     definitions that you think this should work. *)
 
-(* 
+
 Example typechecks :
   (@empty ty) |- test ∈ TNat.
 Proof.
@@ -1379,7 +1385,6 @@ Example numtest_reduces :
 Proof.
   unfold test. normalize.
 Qed.
-*)
 
 End Numtest.
 
@@ -1397,7 +1402,6 @@ Definition test :=
           (tnat 6))
         (tnat 7))).
 
-(* 
 Example typechecks :
   (@empty ty) |- test ∈ TNat.
 Proof. unfold test. eauto 15. Qed.
@@ -1405,7 +1409,6 @@ Proof. unfold test. eauto 15. Qed.
 Example reduces :
   test ==>* tnat 6.
 Proof. unfold test. normalize. Qed.
-*)
 
 End Prodtest.
 
@@ -1420,7 +1423,6 @@ Definition test :=
     (tpred (tnat 6))
     (tsucc (tvar x)).
 
-(* 
 Example typechecks :
   (@empty ty) |- test ∈ TNat.
 Proof. unfold test. eauto 15. Qed.
@@ -1428,7 +1430,6 @@ Proof. unfold test. eauto 15. Qed.
 Example reduces :
   test ==>* tnat 6.
 Proof. unfold test. normalize. Qed.
-*)
 
 End LetTest.
 
@@ -1445,7 +1446,6 @@ Definition test :=
     x (tvar x)
     y (tvar y).
 
-(* 
 Example typechecks :
   (@empty ty) |- test ∈ TNat.
 Proof. unfold test. eauto 15. Qed.
@@ -1453,7 +1453,6 @@ Proof. unfold test. eauto 15. Qed.
 Example reduces :
   test ==>* (tnat 5).
 Proof. unfold test. normalize. Qed.
-*)
 
 End Sumtest1.
 
@@ -1477,7 +1476,6 @@ Definition test :=
       (tapp (tvar processSum) (tinl TNat (tnat 5)))
       (tapp (tvar processSum) (tinr TNat (tnat 5)))).
 
-(* 
 Example typechecks :
   (@empty ty) |- test ∈ (TProd TNat TNat).
 Proof. unfold test. eauto 15. Qed.
@@ -1485,7 +1483,6 @@ Proof. unfold test. eauto 15. Qed.
 Example reduces :
   test ==>* (tpair (tnat 5) (tnat 0)).
 Proof. unfold test. normalize. Qed.
-*)
 
 End Sumtest2.
 
@@ -1505,7 +1502,6 @@ Definition test :=
        (tnat 0)
        x y (tmult (tvar x) (tvar x))).
 
-(* 
 Example typechecks :
   (@empty ty) |- test ∈ TNat.
 Proof. unfold test. eauto 20. Qed.
@@ -1513,7 +1509,6 @@ Proof. unfold test. eauto 20. Qed.
 Example reduces :
   test ==>* (tnat 25).
 Proof. unfold test. normalize. Qed.
-*)
 
 End ListTest.
 
@@ -1539,18 +1534,29 @@ Definition fact :=
 (** (Warning: you may be able to typecheck [fact] but still have some
     rules wrong!) *)
 
-(* 
 Example fact_typechecks :
   (@empty ty) |- fact ∈ (TArrow TNat TNat).
 Proof. unfold fact. auto 10. 
 Qed.
-*)
 
-(* 
 Example fact_example: 
   (tapp fact (tnat 4)) ==>* (tnat 24).
 Proof. unfold fact. normalize. Qed.
-*)
+
+Definition halve :=
+  tfix (tabs f (TArrow TNat TNat)
+         (tabs a TNat
+           (tif0 (tvar a) (tnat 0)
+           (tif0 (tpred (tvar a)) (tnat 0)
+           (tsucc (tapp (tvar f) (tpred (tpred (tvar a))))))))).
+
+Example halve_typechecks :
+  (@empty ty) |- halve ∈ (TArrow TNat TNat).
+Proof. unfold halve. auto 10. Qed.
+
+Example halve_example:
+  (tapp halve (tnat 4)) ==>* (tnat 2).
+Proof. unfold halve. normalize. Qed.
 
 End FixTest1.
 
@@ -1574,8 +1580,6 @@ Definition map :=
             a l (tcons (tapp (tvar g) (tvar a)) 
                          (tapp (tvar f) (tvar l))))))).
 
-(* 
-(* Make sure you've uncommented the last [Hint Extern] above... *)
 Example map_typechecks :
   empty |- map ∈ 
     (TArrow (TArrow TNat TNat)
@@ -1588,7 +1592,6 @@ Example map_example :
          (tcons (tnat 1) (tcons (tnat 2) (tnil TNat)))
   ==>* (tcons (tnat 2) (tcons (tnat 3) (tnil TNat))).
 Proof. unfold map. normalize. Qed.
-*)
 
 End FixTest2.
 
@@ -1615,24 +1618,18 @@ Definition equal :=
                               (tpred (tvar m)))
                       (tpred (tvar n)))))))).
 
-(* 
 Example equal_typechecks :
   (@empty ty) |- equal ∈ (TArrow TNat (TArrow TNat TNat)).
 Proof. unfold equal. auto 10. 
 Qed.
-*)
 
-(* 
 Example equal_example1: 
   (tapp (tapp equal (tnat 4)) (tnat 4)) ==>* (tnat 1).
 Proof. unfold equal. normalize. Qed.
-*)
 
-(* 
 Example equal_example2: 
   (tapp (tapp equal (tnat 4)) (tnat 5)) ==>* (tnat 0).
 Proof. unfold equal. normalize. Qed.
-*)
 
 End FixTest3.
 
@@ -1668,18 +1665,14 @@ Definition eotest :=
     (tapp (tvar even) (tnat 3))
     (tapp (tvar even) (tnat 4))))).
 
-(* 
 Example eotest_typechecks :
   (@empty ty) |- eotest ∈ (TProd TNat TNat).
 Proof. unfold eotest. eauto 30. 
 Qed.
-*)
 
-(* 
 Example eotest_example1: 
   eotest ==>* (tpair (tnat 0) (tnat 1)).
 Proof. unfold eotest. normalize. Qed.
-*)
 
 End FixTest4.
 
@@ -1819,8 +1812,11 @@ Proof with eauto.
       exists (tsnd t1')...
   Case "T_Unit".
     left...
-(* let *)
-(* FILL IN HERE *)
+  Case "T_Let". right.
+    clear IHHt2. apply (fun f => f eq_refl) in IHHt1.
+    destruct IHHt1.
+      exists ([x := v] t)...
+      inverts H. exists (tlet x x0 t)...
   Case "T_Inl".
     destruct IHHt... 
     SCase "t1 steps". 
@@ -1868,7 +1864,10 @@ Proof with eauto.
       inversion H as [t1' Hstp].
       exists (tlcase t1' t2 x1 x2 t3)...
 (* fix *)
-(* FILL IN HERE *)
+  Case "T_Fix".
+    apply (fun f => f eq_refl) in IHHt. right. destruct IHHt.
+      inverts Ht; inverts H. exists ([x := tfix (tabs x T t12)] t12)...
+      inverts H. exists (tfix x)...
 Qed.
 
 (* ###################################################################### *)
@@ -1921,7 +1920,13 @@ Inductive appears_free_in : id -> tm -> Prop :=
       appears_free_in x t ->
       appears_free_in x (tsnd t)
   (* let *)
-(* FILL IN HERE *)
+  | afi_let1 : forall x t i v,
+                 appears_free_in x t ->
+                 x <> i ->
+                 appears_free_in x (tlet i v t)
+  | afi_let2 : forall x v i t,
+                 appears_free_in x v ->
+                 appears_free_in x (tlet i v t)
   (* sums *)
   | afi_inl : forall x t T,
       appears_free_in x t ->
@@ -1959,7 +1964,9 @@ Inductive appears_free_in : id -> tm -> Prop :=
      appears_free_in x t3 ->
      appears_free_in x (tlcase t1 t2 y1 y2 t3)
   (* fix *)
-(* FILL IN HERE *)
+  | afi_fix : forall x t,
+                appears_free_in x t ->
+                appears_free_in x (tfix t)
   .
 
 Hint Constructors appears_free_in.
@@ -1985,7 +1992,11 @@ Proof with eauto.
   Case "T_Pair". 
     apply T_Pair...
 (* let *)
-(* FILL IN HERE *)
+  Case "T_Let". econstructor.
+    apply IHhas_type1; intros. apply Heqv...
+    apply IHhas_type2; intros. destruct (eq_id_dec x x0).
+      induction e. repeat rewrite extend_eq...
+      repeat rewrite extend_neq...
   Case "T_Case".
     eapply T_Case... 
      apply IHhas_type2. intros y Hafi.
@@ -2015,7 +2026,8 @@ Proof with eauto.
     unfold extend in Hctx. 
     rewrite neq_id in Hctx...
 (* let *)
-(* FILL IN HERE *)
+  Case "T_Let".
+    rewrite extend_neq in IHHtyp2...
   Case "T_Case".
     SCase "left".
       destruct IHHtyp2 as [T' Hctx]... exists T'. 
@@ -2034,6 +2046,14 @@ Qed.
 
 (* ###################################################################### *)
 (** *** Substitution *)
+
+Lemma extend_swap : forall (A : Type) (Gamma : partial_map A) (x y i : id) (T1 T2 : A),
+                      x <> y ->
+                      extend (extend Gamma x T1) y T2 i = extend (extend Gamma y T2) x T1 i.
+Proof. introv neq. unfold extend.
+       destruct (eq_id_dec y i), (eq_id_dec x i); subst; eauto.
+       exfalso. apply neq. reflexivity. Qed.
+
 
 Lemma substitution_preserves_typing : forall Gamma x U v t S,
      (extend Gamma x U) |- t ∈ S  ->
@@ -2113,7 +2133,11 @@ Proof with eauto.
       destruct (eq_id_dec y z)...
       subst. rewrite neq_id...
 (* let *)
-(* FILL IN HERE *)
+  Case "tlet".
+    econstructor...
+    destruct (eq_id_dec x i).
+      induction e. eapply context_invariance... intros. rewrite extend_shadow...
+      eapply IHt2. eapply context_invariance... intros. rewrite extend_swap...
   Case "tcase".
     rename i into x1. rename i0 into x2.
     eapply T_Case...
@@ -2209,7 +2233,8 @@ Proof with eauto.
   Case "T_Snd".
     inversion HT...
 (* let *)
-(* FILL IN HERE *)
+  Case "T_Let".
+    eapply substitution_preserves_typing...
   Case "T_Case".
     SCase "ST_CaseInl".
       inversion HT1; subst. 
@@ -2223,7 +2248,8 @@ Proof with eauto.
       apply substitution_preserves_typing with (TList T1)...
       apply substitution_preserves_typing with T1...
 (* fix *)
-(* FILL IN HERE *)
+  Case "T_Fix".
+    eapply substitution_preserves_typing... inverts HT...
 Qed.
 (** [] *)
 
