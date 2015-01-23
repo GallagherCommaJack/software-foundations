@@ -407,42 +407,31 @@ Inductive substi (s:tm) (x:id) : tm -> tm -> Prop :=
 Hint Constructors substi.
 
 Theorem eq_ty_dec : forall (t1 t2 : ty), {t1 = t2} + {t1 <> t2}.
-Proof. induction t1; destruct t2; try (right; intro; inversion H; fail).
-       + left. reflexivity.
-       + destruct (IHt1_1 t2_1), (IHt1_2 t2_2);
-         try (left; induction e; induction e0; reflexivity);
-         try (right; intro; inversion H; contradiction).
+Proof. induction t1; destruct t2; [left; trivial | | |]; try (right; discriminate).
+       - destruct (IHt1_1 t2_1), (IHt1_2 t2_2); [ left | right | right | right ]; crush.
 Qed.
 
 Theorem eq_tm_dec : forall (t1 t2 : tm), {t1 = t2} + {t1 <> t2}.
-Proof. induction t1; destruct t2;
-       try (left; auto; fail); try (right; intro; inversion H; fail);
-       try(
-           try destruct (IHt1_1 t2_1), (IHt1_2 t2_2); try destruct (IHt1_3 t2_3);
-           try (left; induction e; try induction e0; try induction e1; reflexivity);
-           right; intro; inversion H; contradiction
-         ).
-       + destruct (eq_id_dec i i0).
-         - left. induction e. reflexivity.
-         - right. intro. inversion H. contradiction.
-       + destruct (eq_id_dec i i0), (eq_ty_dec t t0), (IHt1 t2);
-         try (left; induction e; induction e0; induction e1; reflexivity);
-         try (right; intro; inversion H; contradiction).
+Proof. induction t1; destruct t2; try (left; reflexivity); try (right; discriminate).
+       (* All that's left are cases with the same constructors *)
+       - Case "id". destruct (eq_id_dec i i0); [left | right]; crush.
+       - Case "tapp".
+         destruct (IHt1_1 t2_1), (IHt1_2 t2_2); [left | right | right | right ]; crush.
+       - Case "tabs".
+         destruct (IHt1 t2), (eq_ty_dec t t0), (eq_id_dec i i0);
+           [ left | right | right | right | right | right | right | right ];
+           subst; eauto; injection 1; crush.
+       - Case "tif".
+         destruct (IHt1_1 t2_1), (IHt1_2 t2_2), (IHt1_3 t2_3);
+           [ left | right | right | right | right | right | right | right ];
+           subst; eauto; injection 1; crush.
 Qed.
 
 Theorem substi_correct : forall s x t t',
   [x:=s]t = t' <-> substi s x t t'.
-Proof with auto.
-  split; intros.
-  + generalize dependent t'; induction t; intros; simpl in *;
-    try (destruct (eq_id_dec x0 i)); try (induction e, H); 
-    try (destruct t'; inversion H; subst)...
-  + induction H; simpl;
-    try rewrite eq_id;
-    try destruct (eq_id_dec x0 y0); try induction IHsubsti;
-    try induction IHsubsti1; try induction IHsubsti2; try induction IHsubsti3...
-    - symmetry in e. contradiction.
-    - contradiction.
+Proof. intros s x t t'; split.
+  - generalize dependent t'; induction t; crush; destruct (eq_id_dec x i); crush.
+  - induction 1; unfold subst; fold subst; try rewrite eq_id; try rewrite neq_id; crush.
 Qed.
 (** [] *)
 
@@ -789,14 +778,7 @@ Example typing_example_2_full :
        (tabs y (TArrow TBool TBool)
           (tapp (tvar y) (tapp (tvar y) (tvar x))))) ∈
     (TArrow TBool (TArrow (TArrow TBool TBool) TBool)).
-Proof.
-  repeat apply T_Abs.
-  apply T_App with (T11 := TBool).
-    apply T_Var. unfold extend. rewrite eq_id. reflexivity.
-  apply T_App with (T11 := TBool).
-    apply T_Var. unfold extend. rewrite eq_id. reflexivity.
-  apply T_Var. reflexivity.
-Qed.
+Proof. repeat econstructor. Qed.
   (** [] *)
 
 (** **** Exercise: 2 stars (typing_example_3) *)
@@ -815,7 +797,7 @@ Example typing_example_3 :
             (tabs z TBool
                (tapp (tvar y) (tapp (tvar x) (tvar z)))))) ∈
       T.
-Proof with auto.
+Proof.
   exists (TArrow (TArrow TBool TBool)
             (TArrow (TArrow TBool TBool)
                     (TArrow TBool TBool))).  
