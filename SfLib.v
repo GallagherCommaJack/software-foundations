@@ -17,6 +17,7 @@ Export ListNotations.
 Require Export Arith.
 Require Export Arith.EqNat.  (* Contains [beq_nat], among other things *)
 Require Export CpdtTactics.
+Require Export LibTactics.
 (** * From Basics.v *)
 
 Definition admit {T: Type} : T.  Admitted.
