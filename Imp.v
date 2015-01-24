@@ -196,26 +196,10 @@ Module AExp.
 
   Theorem optimize_0plus_sound: forall a,
                                   aeval (optimize_0plus a) = aeval a.
-  Proof.
-    intros a. induction a.
-    Case "ANum". reflexivity.
-    Case "APlus". destruct a1.
-    SCase "a1 = ANum n". destruct n.
-    SSCase "n = 0".  simpl. apply IHa2.
-    SSCase "n <> 0". simpl. rewrite IHa2. reflexivity.
-    SCase "a1 = APlus a1_1 a1_2".
-    simpl. simpl in IHa1. rewrite IHa1.
-    rewrite IHa2. reflexivity.
-    SCase "a1 = AMinus a1_1 a1_2".
-    simpl. simpl in IHa1. rewrite IHa1.
-    rewrite IHa2. reflexivity.
-    SCase "a1 = AMult a1_1 a1_2".
-    simpl. simpl in IHa1. rewrite IHa1.
-    rewrite IHa2. reflexivity.
-    Case "AMinus".
-    simpl. rewrite IHa1. rewrite IHa2. reflexivity.
-    Case "AMult".
-    simpl. rewrite IHa1. rewrite IHa2. reflexivity.  Qed.
+    induction a; crush.
+    - Case "plus". destruct a1; crush. destruct n; crush.
+  Qed.
+  Hint Rewrite optimize_0plus_sound.
 
   (* ####################################################### *)
   (** * Coq Automation *)
@@ -536,10 +520,7 @@ and it offers plenty of power for many purposes.  Here's an example.
 
   Theorem optimize_0plus_b_sound : forall b,
                                      beval (optimize_0plus_b b) = beval b.
-  Proof. intros. induction b; simpl; repeat (rewrite optimize_0plus_sound);
-                 try (rewrite IHb); try reflexivity.
-         rewrite IHb1. rewrite IHb2. reflexivity.
-  Qed.
+  Proof. induction b; crush. Qed.
   
   (** [] *)
 
@@ -551,84 +532,63 @@ and it offers plenty of power for many purposes.  Here's an example.
    *)
 
   Theorem le_proc : forall n m, {n <= m} + {m <= n}.
-  Proof. induction n as [|n']; intros; [Case "n = 0" | Case "n = S n'"]; 
-         destruct m as [|m']; try (left; try (apply le_n); apply le_0_n).
-         Case "n = S n'".
-         SCase "m = 0". right. apply le_0_n.
-         SCase "m = S m'". destruct (IHn' m'); [left | right];
-                           apply le_n_S; apply l.
-  Defined. 
+  Proof. induction n; destruct m; crush. destruct (IHn m); crush. Defined.
 
   Theorem eq_nat_proc : forall n m : nat, {n = m} + {n <> m}.
-  Proof. induction n as [|n']; intros; destruct m as [|m']; 
-         try (destruct (IHn' m')); subst; 
-         try (left; reflexivity); right; simplify_eq; apply n. 
-  Qed.
+  Proof. induction n; destruct m; crush. destruct (IHn m); crush. Defined.
   
-  Fixpoint optimize_precompute_le (b : bexp) : bexp.
-  Proof. destruct b eqn:Heqeb. 
-         Case "b = BTrue"; apply b.
-         Case "b = BFalse"; apply b.
-         Case "b = BEq a a0"; apply b.
-         Case "b = BLe a a0". 
-         remember (aeval a) as n. remember (aeval a0) as m.
-         destruct (le_proc n m).
-         SCase "a <= a0". apply BTrue.
-         SCase "a >= a0". destruct (eq_nat_proc m n); [apply BTrue | apply BFalse].
-         Case "b = BNot b0". apply BNot. apply optimize_precompute_le. apply b0.
-         Case "b = BAnd b0_1 b0_2". apply BAnd; apply optimize_precompute_le.
-         apply b0_1. apply b0_2.
-  Defined.
+  Fixpoint optimize_precompute_le (b : bexp) : bexp :=
+    match b with
+      | BLe a a0 => match ble_nat (aeval a) (aeval a0) with
+                      | true => BTrue
+                      | false => BFalse
+                    end
+      | BNot b' => BNot (optimize_precompute_le b')
+      | BAnd b0_1 b0_2 => BAnd (optimize_precompute_le b0_1) (optimize_precompute_le b0_2)
+      | _ => b
+    end.
 
   Lemma ble_nat_Sn_m : forall n m, ble_nat (S n) m = true -> ble_nat n m = true.
-  Proof. induction n; intros. reflexivity.
-         destruct m. inversion H. simpl. apply IHn. apply H. Qed.
+  Proof. induction n; destruct m; crush. Qed.
+
+  Hint Resolve ble_nat_Sn_m.
 
   Lemma ble_nat_n_Sm : forall n m, ble_nat n m = true -> ble_nat n (S m) = true.
-  Proof. induction n; intros; try reflexivity. 
-         simpl. apply ble_nat_Sn_m. apply H. Qed.
+    induction n; crush. Qed.
+
+  Hint Resolve ble_nat_n_Sm.
+  Hint Rewrite ble_nat_refl.
 
   Theorem true_ble_nat : forall a b, a <= b -> ble_nat a b = true.
-  Proof. intros. induction H. apply ble_nat_refl. 
-         apply ble_nat_n_Sm. apply IHle. Qed.
+    induction 1; crush. Qed.
 
-  Theorem eq_nat_proc_refl : forall n, exists p : n = n, eq_nat_proc n n = left p.
-  Proof. intros. destruct (eq_nat_proc n n) as [H|H]; 
-                 try (exists H; reflexivity); exfalso; apply H; reflexivity.
+  Hint Resolve true_ble_nat.
+
+  Theorem ble_nat_true : forall a b, ble_nat a b = true -> a <= b.
+    induction a; destruct b; crush. Qed.
+
+  Hint Resolve ble_nat_true.
+
+  Theorem eq_nat_proc_refl : forall n, exists p, eq_nat_proc n n = left p.
+  Proof. intros. destruct (eq_nat_proc n n) as [H|H]; crush.
+         destruct H. exists (@eq_refl nat n0); reflexivity.
   Qed.
+
+  Hint Rewrite eq_nat_proc_refl.
 
   Lemma n_neq_Sn : forall n, n <> S n.
-  Proof. intros. intro. induction n. inversion H. apply IHn.
-         inversion H. apply H. Qed.       
+    induction n; crush. Qed.
 
   Lemma Sn_nle_n : forall n, ~ (S n <= n).
-  Proof. induction n; intros; intro; inversion H.
-         apply (n_neq_Sn n). symmetry. apply H1.
-         apply IHn. apply le_Sn_le. apply H1.
-  Qed.
+    induction n; crush. Qed.
 
   Lemma n_le_m_neq_Sm : forall n m, n <= m -> n <> S m.
-  Proof. induction n; intros; try simplify_eq; intro; subst.
-         apply (Sn_nle_n m). apply H. Qed.
+    induction n; crush. Qed.
 
   Theorem optimize_precompute_le_sound : forall b, 
                                            beval b = beval (optimize_precompute_le b).
-  Proof. induction b; intros;
-         try (simpl; try rewrite IHb; try rewrite IHb1; try rewrite IHb2; reflexivity).
-         Case "b = BLe a a0". 
-         destruct (le_proc (aeval a) (aeval a0)) eqn:leaa0; simpl; rewrite leaa0;
-         clear leaa0.
-         SCase "a <= a0". apply true_ble_nat in l. apply l.
-         SCase "a0 <= a". inversion l; subst.
-         rewrite ble_nat_refl.
-         remember (aeval a0) as n. 
-         destruct (eq_nat_proc n n) eqn:eqn; try reflexivity.
-         exfalso. apply n0. reflexivity.
-         replace (ble_nat (S m) (aeval a0)) with false.
-         destruct (eq_nat_proc (aeval a0) (S m)); subst; try rewrite e in *;
-         [exfalso; apply (Sn_nle_n m); apply H0 | reflexivity].
-         destruct (ble_nat (S m) (aeval a0)) eqn:ble; try reflexivity; exfalso.
-         apply ble_nat_true in ble. firstorder.
+  Proof. induction b; crush.
+         - Case "ble_nat a a0". destruct (ble_nat (aeval a) (aeval a0)); crush.
   Qed.       
   (** [] *)
 
@@ -761,7 +721,9 @@ and it offers plenty of power for many purposes.  Here's an example.
   | E_AMult :  forall (e1 e2: aexp) (n1 n2 : nat),
                  (e1 || n1) -> (e2 || n2) -> (AMult e1 e2) || (n1 * n2)
 
-                                                         where "e '||' n" := (aevalR e n) : type_scope.
+     where "e '||' n" := (aevalR e n) : type_scope.
+
+  Hint Constructors aevalR.
 
   Tactic Notation "aevalR_cases" tactic(first) ident(c) :=
     first;
@@ -834,40 +796,14 @@ and it offers plenty of power for many purposes.  Here's an example.
     definitions of evaluation agree on all possible arithmetic
     expressions... *)
 
-  Theorem aeval_iff_aevalR : forall a n,
-                               (a || n) <-> aeval a = n.
-Proof.
- split.
- Case "->".
-   intros H.
-   aevalR_cases (induction H) SCase; simpl.
-   SCase "E_ANum".
-     reflexivity.
-   SCase "E_APlus".
-     rewrite IHaevalR1.  rewrite IHaevalR2.  reflexivity.
-   SCase "E_AMinus".
-     rewrite IHaevalR1.  rewrite IHaevalR2.  reflexivity.
-   SCase "E_AMult".
-     rewrite IHaevalR1.  rewrite IHaevalR2.  reflexivity.
- Case "<-".
-   generalize dependent n.
-   aexp_cases (induction a) SCase;
-      simpl; intros; subst.
-   SCase "ANum".
-     apply E_ANum.
-   SCase "APlus".
-     apply E_APlus.
-      apply IHa1. reflexivity.
-      apply IHa2. reflexivity.
-   SCase "AMinus".
-     apply E_AMinus.
-      apply IHa1. reflexivity.
-      apply IHa2. reflexivity.
-   SCase "AMult".
-     apply E_AMult.
-      apply IHa1. reflexivity.
-      apply IHa2. reflexivity.
+Theorem aeval_iff_aevalR : forall a n,
+                             (a || n) <-> aeval a = n.
+Proof. split.
+       - induction 1; crush.
+       - generalize dependent n; aexp_cases (induction a) Case; crush.
 Qed.
+
+Hint Rewrite aeval_iff_aevalR.
 
 (** Note: if you're reading the HTML file, you'll see an empty square box instead
 of a proof for this theorem.  
@@ -906,18 +842,14 @@ Inductive bevalR : bexp -> bool -> Prop :=
              be1 // b1 -> be2 // b2 -> BAnd be1 be2 // andb b1 b2
   where "a '//' b" := (bevalR a b) : type_scope.
 
+Hint Constructors bevalR.
+
 Theorem bevalR_iff : forall be b, be // b <-> beval be = b.
 Proof. split; intros.
-       Case "->". 
-         induction H; try apply aeval_iff_aevalR in H; 
-         try apply aeval_iff_aevalR in H0; simpl; subst;
-         reflexivity.         
-       Case "<-". generalize dependent b.
-         induction be; intros; simpl in *;
-         try (subst; constructor; try apply aeval_iff_aevalR; reflexivity);
-         destruct b; rewrite <- H; constructor; 
-         try apply IHbe; try apply IHbe1; try apply IHbe2;
-         reflexivity.
+       - induction H; crush.
+       - generalize dependent b; induction be; crush.
+         + apply E_BEq; crush.
+         + apply E_BLe; crush.
 Qed.
 (** [] *)
 End AExp.
@@ -1034,32 +966,22 @@ Inductive id : Type :=
   Id : nat -> id.
 
 Theorem eq_id_dec : forall id1 id2 : id, {id1 = id2} + {id1 <> id2}.
-Proof.
-   intros id1 id2.
-   destruct id1 as [n1]. destruct id2 as [n2].
-   destruct (eq_nat_dec n1 n2) as [Heq | Hneq].
-   Case "n1 = n2".
-     left. rewrite Heq. reflexivity.
-   Case "n1 <> n2".
-     right. intros contra. inversion contra. apply Hneq. apply H0.
+Proof. intros; destruct id1, id2.
+       destruct (eq_nat_dec n n0); [left | right]; crush.
 Defined. 
 
 (** The following lemmas will be useful for rewriting terms involving [eq_id_dec]. *)
 
 Lemma eq_id : forall (T:Type) x (p q:T), 
               (if eq_id_dec x x then p else q) = p. 
-Proof.
-  intros. 
-  destruct (eq_id_dec x x). 
-  Case "x = x". 
-    reflexivity.
-  Case "x <> x (impossible)". 
-    apply ex_falso_quodlibet; apply n; reflexivity. Qed.
+Proof. intros; destruct (eq_id_dec x x); crush. Qed.
 
 (** **** Exercise: 1 star, optional (neq_id) *)
 Lemma neq_id : forall (T:Type) x y (p q:T), x <> y -> 
                (if eq_id_dec x y then p else q) = q. 
-Proof. intros. destruct (eq_id_dec x y). contradiction. reflexivity. Qed.
+Proof. intros; destruct (eq_id_dec x y); crush. Qed.
+
+Hint Rewrite eq_id neq_id.
 (** [] *)
 
 
@@ -1094,19 +1016,18 @@ Definition update (st : state) (x : id) (n : nat) : state :=
 (** **** Exercise: 1 star (update_eq) *)
 Theorem update_eq : forall n x st,
   (update st x n) x = n.
-Proof. intros. unfold state in st. unfold update.
-       destruct (eq_id_dec x x); try (exfalso; apply n0); reflexivity.
-Qed.       
+Proof. intros; unfold update; rewrite eq_id; crush. Qed.
 
+Hint Rewrite update_eq.
 (** [] *)
 
 (** **** Exercise: 1 star (update_neq) *)
 Theorem update_neq : forall x2 x1 n st,
   x2 <> x1 ->                        
   (update st x2 n) x1 = (st x1).
-Proof. intros. unfold state in *. unfold update.
-       destruct (eq_id_dec x2 x1); try contradiction; reflexivity.
-Qed.  
+Proof. unfold update; intros; rewrite neq_id; crush. Qed.
+
+Hint Rewrite update_neq.
 (** [] *)
 
 (** **** Exercise: 1 star (update_example) *)
@@ -1121,24 +1042,26 @@ Proof. reflexivity. Qed.
 (** **** Exercise: 1 star (update_shadow) *)
 Theorem update_shadow : forall n1 n2 x1 x2 (st : state),
    (update  (update st x2 n1) x2 n2) x1 = (update st x2 n2) x1.
-Proof. intros. unfold update. destruct (eq_id_dec x2 x1); reflexivity. Qed.
+Proof. intros; unfold update; destruct (eq_id_dec x2 x1); reflexivity. Qed.
 
 (** [] *)
+Hint Rewrite update_shadow.
 
 (** **** Exercise: 2 stars (update_same) *)
 Theorem update_same : forall n1 x1 x2 (st : state),
   st x1 = n1 ->
   (update st x1 n1) x2 = st x2.
-Proof. intros. unfold update. destruct (eq_id_dec x1 x2); subst; reflexivity. Qed.
+Proof. intros; unfold update; destruct (eq_id_dec x1 x2); crush. Qed.
+
+Hint Rewrite update_same.
 (** [] *)
 
 (** **** Exercise: 3 stars (update_permute) *)
 Theorem update_permute : forall n1 n2 x1 x2 x3 st,
   x2 <> x1 -> 
   (update (update st x2 n1) x1 n2) x3 = (update (update st x1 n2) x2 n1) x3.
-Proof. intros. unfold update.
-       destruct (eq_id_dec x1 x3), (eq_id_dec x2 x3);
-       try contradiction; try reflexivity; subst; firstorder.
+Proof. intros; unfold update.
+       destruct (eq_id_dec x1 x3), (eq_id_dec x2 x3); crush.
 Qed.
 (** [] *)
 
@@ -1492,6 +1415,7 @@ Tactic Notation "ceval_cases" tactic(first) ident(c) :=
   | Case_aux c "E_IfTrue" | Case_aux c "E_IfFalse"
   | Case_aux c "E_WhileEnd" | Case_aux c "E_WhileLoop" ].
 
+Hint Constructors ceval.
 (** *** *)
 (** The cost of defining evaluation as a relation instead of a
     function is that we now need to construct _proofs_ that some
@@ -1520,12 +1444,8 @@ Proof.
 Example ceval_example2:
     (X ::= ANum 0;; Y ::= ANum 1;; Z ::= ANum 2) / empty_state ||
     (update (update (update empty_state X 0) Y 1) Z 2).
-Proof.
-  apply E_Seq with (update empty_state X 0);
-  try apply E_Seq with (update (update empty_state X 0) Y 1);
-  try apply E_Seq with (update (update (update empty_state X 0) Y 1) Z 2);
-  try apply E_Ass; try reflexivity.
-Qed.
+Proof. eauto 10. Qed.
+
 (** [] *)
 
 (** **** Exercise: 3 stars, advanced (pup_to_n) *)
@@ -1578,42 +1498,13 @@ Theorem ceval_deterministic: forall c st st1 st2,
      c / st || st1  ->
      c / st || st2 ->
      st1 = st2.
-Proof.
-  intros c st st1 st2 E1 E2.
-  generalize dependent st2.
-  ceval_cases (induction E1) Case;
-           intros st2 E2; inversion E2; subst.
-  Case "E_Skip". reflexivity.
-  Case "E_Ass". reflexivity.
-  Case "E_Seq".
-    assert (st' = st'0) as EQ1.
-      SCase "Proof of assertion". apply IHE1_1; assumption.
-    subst st'0.
-    apply IHE1_2. assumption.
-  Case "E_IfTrue".
-    SCase "b1 evaluates to true".
-      apply IHE1. assumption.
-    SCase "b1 evaluates to false (contradiction)".
-      rewrite H in H5. inversion H5.
-  Case "E_IfFalse".
-    SCase "b1 evaluates to true (contradiction)".
-      rewrite H in H5. inversion H5.
-    SCase "b1 evaluates to false".
-      apply IHE1. assumption.
-  Case "E_WhileEnd".
-    SCase "b1 evaluates to false".
-      reflexivity.
-    SCase "b1 evaluates to true (contradiction)".
-      rewrite H in H2. inversion H2.
-  Case "E_WhileLoop".
-    SCase "b1 evaluates to false (contradiction)".
-      rewrite H in H4. inversion H4.
-    SCase "b1 evaluates to true".
-      assert (st' = st'0) as EQ1.
-        SSCase "Proof of assertion". apply IHE1_1; assumption.
-      subst st'0.
-      apply IHE1_2. assumption.  Qed.
+Proof. introv E1 E2; generalize dependent st2.
+       ceval_cases (induction E1) Case; intros; inverts E2; crush.
+       - Case "E_Seq". apply IHE1_1 in H1; crush.
+       - Case "E_WhileLoop". apply IHE1_1 in H3; crush.
+Qed.
 
+Hint Rewrite ceval_deterministic.
 (* ####################################################### *)
 (** * Reasoning About Imp Programs *)
 
@@ -1627,7 +1518,7 @@ Theorem plus2_spec : forall st n st',
   st X = n ->
   plus2 / st || st' ->
   st' X = n + 2.
-Proof.
+Proof. 
   intros st n st' HX. intro Heval.
   (* Inverting Heval essentially forces Coq to expand one
      step of the ceval computation - in this case revealing
@@ -1644,16 +1535,7 @@ Proof.
 (** **** Exercise: 3 stars (loop_never_stops) *)
 Theorem loop_never_stops : forall st st',
   ~(loop / st || st').
-Proof.
-  intros st st' contra. unfold loop in contra.
-  remember (WHILE BTrue DO SKIP END) as loopdef eqn:Heqloopdef.
-    (* Proceed by induction on the assumed derivation showing that
-     [loopdef] terminates.  Most of the cases are immediately
-     contradictory (and so can be solved in one step with
-     [inversion]). *)
-  induction contra; inversion Heqloopdef; subst.
-  inversion H. apply IHcontra2. reflexivity.
-Qed.
+Proof. remember loop; induction 1; inverts Heqc; crush. Qed.
 (** [] *)
 
 (** **** Exercise: 3 stars (no_whilesR) *)
@@ -1682,17 +1564,13 @@ Inductive no_whilesR: com -> Prop :=
 | NW_If : forall c1 c2 c3, 
             no_whilesR c2 -> no_whilesR c3 -> no_whilesR (IFB c1 THEN c2 ELSE c3 FI).
 
+Hint Constructors no_whilesR.
+
 Theorem no_whiles_eqv:
    forall c, no_whiles c = true <-> no_whilesR c.
-Proof. split; intros.
-       Case "->". 
-         induction c; try constructor; inversion H; 
-         try apply IHc1; try apply IHc2;
-         destruct (no_whiles c1); destruct (no_whiles c2);
-         inversion H1; reflexivity.
-       Case "<-".
-         induction H; try reflexivity; simpl;
-         rewrite IHno_whilesR1; rewrite IHno_whilesR2; reflexivity.
+Proof. split.
+       - induction c; crush; destruct (no_whiles c1), (no_whiles c2); crush.
+       - induction 1; crush.
 Qed.
 (** [] *)
 
@@ -1703,18 +1581,16 @@ Qed.
 
 Theorem no_whiles_terminates : 
   forall c st, no_whilesR c -> exists st', c / st || st'.
-Proof. intros. generalize dependent st. induction H as [|i a| |]; intros.
-       Case "c = SKIP". exists st. constructor.
-       Case "c = i := a". 
-         exists (update st i (aeval st a)). constructor. reflexivity.
-       Case "c = c1 ;; c2".
-         remember (IHno_whilesR1 st). inversion e.
-         remember (IHno_whilesR2 x). inversion e0.
-         exists x0. apply E_Seq with (st' := x); assumption.
-       Case "c = IFB c1 THEN c2 ELSE c3 FI".
-         remember (IHno_whilesR1 st); remember (IHno_whilesR2 st).
-         destruct (beval st c1) eqn:bc1; [inversion e | inversion e0]; exists x;
-         try (constructor; assumption); eapply E_IfFalse; assumption.
+Proof. intros. generalize dependent st. induction H as [|i a| |]; crush.
+       - Case "SKIP". exists st. constructor.
+       - Case "i := a". exists (update st i (aeval st a)); crush.
+       - Case "c1 ;; c2".
+         destruct (IHno_whilesR1 st) as [st']; destruct (IHno_whilesR2 st') as [st''].
+         exists st''. apply E_Seq with (st' := st'); crush. 
+       - Case "IFB c1 THEN c2 ELSE c3 FI".
+         destruct (IHno_whilesR1 st) as [st1 H1];
+           destruct (IHno_whilesR2 st) as [st2 H2].
+         destruct (beval st c1) eqn:be; [exists st1 | exists st2]; crush.
 Qed.
 (** [] *)
 
