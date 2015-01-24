@@ -16,21 +16,13 @@ Lemma canonical_forms_bool : forall t,
   empty |- t ∈ TBool ->
   value t ->
   (t = ttrue) \/ (t = tfalse).
-Proof.
-  introv HT HVal.
-  inversion HVal; intros; subst; try inversion HT; auto.
-Qed.
+Proof. repeat inversion 1; crush. Qed.
 
 Lemma canonical_forms_fun : forall t T1 T2,
   empty |- t ∈ (TArrow T1 T2) ->
   value t ->
   exists x u, t = tabs x T1 u.
-Proof.
-  introv HT HVal.
-  inversion HVal; intros; subst; try inversion HT; subst; auto.
-  exists x0. exists t0.  auto.
-Qed.
-   
+Proof. introv Ht HVal; inverts HVal; inverts Ht. exists x0 t0; crush. Qed.
 
 (* ###################################################################### *)
 (** * Progress *)
@@ -129,25 +121,20 @@ Qed.
 Theorem progress' : forall t T,
      empty |- t ∈ T ->
      value t \/ exists t', t ==> t'.
-Proof with auto.
-  t_cases (induction t) Case; introv Ht; auto; inverts Ht as Ht1 Ht2 Ht3;
-  try (remember Ht1; clear Heqh); try (remember Ht2; clear Heqh0);
-  try (remember Ht3; clear Heqh1);
-  try (apply IHt1 in Ht1); try (apply IHt2 in Ht2); try (apply IHt3 in Ht3).
-  { Case "tvar". compute in Ht1. inverts Ht1. }
-  { Case "tapp". right.
-    destruct Ht1; inverts H; try (inverts h; fail).
-    { destruct Ht2.
-      { exists ([x0 := t2] t)... }
-      { inverts H. exists (tapp (tabs x0 T0 t) x1)... } }
-    { exists (tapp x0 t2)... } }
-  { Case "tif". right. destruct Ht1; inverts H; inverts h;
-                       try (inverts H0; fail)...
-    { exists t2... }
-    { exists t3... }
-    { exists (tif x0 t2 t3)... }
-    { exists (tif x0 t2 t3)... } }
-Qed.
+Proof.
+  t_cases (induction t) Case; introv Ht; auto; inverts Ht as Ht1 Ht2 Ht3; crush.
+  - Case "tvar". inverts Ht1.
+  - Case "tapp". right.
+    destruct (IHt1 _ Ht1) as [vt1|st1].
+    + destruct (IHt2 _ Ht2) as [vt2|st2].
+      * inverts vt1; inverts Ht1. exists ([x0 := t2] t); crush.
+      * inverts st2. exists (tapp t1 x0); crush.
+    + inverts st1. exists (tapp x0 t2); crush.
+  - Case "tif". right.
+    destruct (IHt1 _ Ht1) as [vt1|st1].
+    + inverts vt1; inverts Ht1; [exists t2 | exists t3]; crush.
+    + inverts st1. exists (tif x0 t2 t3); crush.
+Qed.  
 
 (** [] *)
 
@@ -289,6 +276,7 @@ Proof.
     rewrite extend_neq in H7; assumption.
 Qed.
 
+Hint Resolve free_in_context.
 (** Next, we'll need the fact that any term [t] which is well typed in
     the empty context is closed -- that is, it has no free variables. *)
 
@@ -296,10 +284,8 @@ Qed.
 Corollary typable_empty__closed : forall t T, 
     empty |- t ∈ T  ->
     closed t.
-Proof with auto.
-  introv Ht. intros v Hc.
-  apply free_in_context with (Gamma := empty) (T := T) in Hc...
-  inverts Hc. inverts H.
+Proof. introv Ht; intros v Hc.
+       eapply free_in_context in Hc; [| eassumption]; crush. inverts H.
 Qed.    
 
 (** [] *)
@@ -578,10 +564,12 @@ Qed.
     then [empty |- t ∈ T]?  If so, prove it.  If not, give a
     counter-example not involving conditionals.
 
-(* Hmm... types can depend on contexts, but I'm not sure this is false *)
 []
 *)
 
+(* Conditionals make it trivially false, and there has to be another counterexample *)
+
+(* (\ x : T -> \ i : T -> i) (\ y : T -> any untyped term here) *)
 
 (* ###################################################################### *)
 (** * Type Soundness *)
@@ -594,6 +582,8 @@ Qed.
 Definition stuck (t:tm) : Prop :=
   (normal_form step) t /\ ~ value t.
 
+Hint Resolve multipreservation.
+
 Corollary soundness : forall t t' T,
   empty |- t ∈ T -> 
   t ==>* t' ->
@@ -601,11 +591,9 @@ Corollary soundness : forall t t' T,
 Proof with eauto.
   intros t t' T Hhas_type Hmulti. unfold stuck.
   intros [Hnf Hnot_val]. unfold normal_form in Hnf.
-  induction Hmulti.
-  { assert (value x0 \/ exists t', x0 ==> t'). { eapply progress... }
-    { destruct H; contradiction. } }
-  { assert (value z0 \/ exists t', z0 ==> t'). {eapply progress. eapply multipreservation...}
-    { destruct H0; contradiction. } }
+  induction Hmulti; crush.
+  - assert (value x0 \/ exists t', x0 ==> t'); [eapply progress | crush]...
+  - assert (value z0 \/ exists t', z0 ==> t'); [eapply progress | crush]...
 Qed.
       
     
@@ -623,11 +611,10 @@ Qed.
 
 Theorem unique : forall t Gamma T T', Gamma |- t ∈ T -> Gamma |- t ∈ T' -> T = T'.
 Proof with eauto.
-  introv Ht1 Ht2. generalize dependent T'.
-  has_type_cases (induction Ht1) Case; intros; inverts Ht2...
-  { Case "T_Var". symmetry in H, H2. induction H. inverts H2... }
-  { Case "T_Abs". apply (f_equal (TArrow T11)). apply IHHt1... }
-  { Case "T_App". apply IHHt1_1 in H2. inverts H2... }
+  introv Ht1 Ht2; generalize dependent T'.
+  has_type_cases (induction Ht1) Case; intros; inverts Ht2; crush...
+  - Case "T_Abs". apply (f_equal (TArrow T11)). apply IHHt1...
+  - Case "T_App". apply IHHt1_1 in H2. inverts H2...
 Qed.
                   
 
@@ -646,26 +633,26 @@ Definition app : forall {A} (a : A) {P : A -> Type}, (forall a, P a) -> P a. aut
 
 Theorem progress'' : forall t T, empty |- t ∈ T -> value t \/ exists t', t ==> t'.
 Proof with eauto.
-  introv Ht. remember (@empty ty). symmetry in Heqp.
+  introv Ht; remember (@empty ty); symmetry in Heqp;
   has_type_cases (induction Ht) Case; induction Heqp;
   try apply (app eq_refl) in IHHt1; try apply (app eq_refl) in IHHt2;
   try apply (app eq_refl) in IHHt3; simpl in *...
-  { Case "T_Var". inverts H. }
-  { Case "T_App". right.
+  - Case "T_Var". inverts H.
+  - Case "T_App". right.
     inverts IHHt1.
-    { inverts IHHt2.
-      { inverts H; inverts Ht1. exists ([x0 := t2] t)... }
-      { inverts H0. exists (tapp t1 x0)... } }
-    { inverts H. exists (tapp x0 t2)... } }
-  { Case "T_If". simpl in *. right.
-    inverts IHHt1; inverts H; inverts Ht1... }
+    + inverts IHHt2.
+      * inverts H; inverts Ht1. exists ([x0 := t2] t)...
+      * inverts H0. exists (tapp t1 x0)...
+    + inverts H. exists (tapp x0 t2)...
+  - Case "T_If". right. simpl in *.
+    inverts IHHt1; inverts H; inverts Ht1...
 Qed.
 
 Theorem  preservation'' : forall t t' T, empty |- t ∈ T -> t ==> t' -> empty |- t' ∈ T.
 Proof with eauto.
-  introv Ht eval. generalize dependent t'. remember (@empty ty). symmetry in Heqp.
+  introv Ht eval; generalize dependent t'; remember (@empty ty); symmetry in Heqp;
   has_type_cases (induction Ht) Case; intros; subst; inverts eval; inverts Ht1...
-  Case "T_App". eapply (substitution_preserves_typing). apply H1. apply Ht2.
+  - Case "T_App". eapply (substitution_preserves_typing). apply H1. apply Ht2.
 Qed.
     
 (** **** Exercise: 2 stars (stlc_variation1) *)
