@@ -1924,8 +1924,8 @@ Theorem while_skip_no_term : forall b st st',
   introv H contra. remember (WHILE b DO SKIP END) as loopdef eqn:whb;
   ceval_cases (induction contra) Case; inverts whb;
   try match goal with
-        | [ cont : SKIP / _ || _ / _ |- _ ] => inverts cont
-        | [ cont : WHILE _ DO SKIP END / _ || _ / _ |- _ ] => inverts cont
+        | [ cont : SKIP / ?st || _ / ?st' |- _ ] => inverts cont
+        | [ cont : WHILE b DO SKIP END / _ || _ / _ |- _ ] => inverts cont
       end; crush.
 Qed.
 
