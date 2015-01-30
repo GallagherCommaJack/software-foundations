@@ -188,10 +188,8 @@ Definition stuck (t:tm) : Prop :=
 Hint Unfold stuck.
 
 (** **** Exercise: 2 stars (some_term_is_stuck) *)
-Example some_term_is_stuck :
-  exists t, stuck t.
-Proof.
-  exists (tiszero ttrue). split; intro; inversion H; inversion H0; inversion H2.
+Example some_term_is_stuck : exists t, stuck t.
+  exists (tiszero ttrue); split; intro; solve by inversion 3.
 Qed.
 (** [] *)
 
@@ -209,20 +207,19 @@ Qed.
     is quite a bit shorter than the other.  For the sake of the
     exercise, try to complete the proof both ways. *)
 
-Lemma value_is_nf : ∀ t,
-  value t -> step_normal_form t.
-Proof.
-  intros. inversion H; [Case "bvalue" | Case "nvalue"].
-  Case "bvalue". inversion H0; intro; inversion H2; inversion H3.
-  Case "nvalue". induction H0.
-    SCase "tzero". intro. inversion H0. inversion H1.
-    SCase "tsucc".
-      intro. inversion H1. inversion H2. subst.
-      apply IHnvalue.
-        right. apply H0.
-        exists t1'. apply H4.
+Lemma value_is_nf : ∀ t, value t -> step_normal_form t.
+  introv Hv Hnf; destruct Hnf; destruct Hv; intros;
+  repeat match goal with
+           | [ p : tsucc _ ==> _ |- _ ] => inverts p
+           | [ IH : forall x, ?t ==> x -> False, _ : ?t ==> _ |- _ ] =>
+             exfalso; eapply IH; eauto
+           | [ p1 : nvalue ?t, p2 : ?t ==> ?t' |- _ ] =>
+             generalize dependent t'; induction p1; intros; [solve by inversion | ]
+           | _ => solve by inversion 2
+         end.
 Qed.
-  
+
+Hint Resolve value_is_nf.
 (** [] *)
 
 
@@ -230,30 +227,22 @@ Qed.
 (** Using [value_is_nf], we can show that the [step] relation is
     also deterministic... *)
 
-Theorem nf_s : ∀ t, step_normal_form t -> step_normal_form (tsucc t).
-Proof. intros. intro. inversion H0. inversion H1. apply H. exists t1'. apply H3.
-Qed.
+Lemma nf_s : ∀ t, step_normal_form t -> step_normal_form (tsucc t).
+  unfold normal_form; destruct 2 as [k Hnfst]; inverts Hnfst; nexelim. Qed.
 
-Theorem step_deterministic:
-  deterministic step.
-Proof with eauto.
-  unfold deterministic. intros. generalize dependent y2.
-  step_cases (induction H) Case; intros; inversion H0; subst; try reflexivity;
-  try (inversion H4; reflexivity); try (apply IHstep in H2; subst; reflexivity);
-  try (inversion H; reflexivity).
-  Case "ST_If". apply IHstep in H5. subst. reflexivity.
-  Case "ST_PredZero". inversion H1.
-  Case "ST_PredSucc". exfalso. eapply nf_s. eapply value_is_nf. 
-    right. apply H. exists t1'. apply H2.
-  Case "ST_Pred". inversion H. 
-    exfalso. eapply nf_s. eapply value_is_nf. 
-      right. apply H2. exists t1'. apply H.
-  Case "ST_IszeroZero". inversion H1.
-    exfalso. eapply nf_s. eapply value_is_nf.
-      right. apply H. exists t1'. apply H2.
-   Case "ST_Iszero". inversion H.
-     exfalso. eapply nf_s. eapply value_is_nf.
-       right. apply H2. exists t1'. apply H.
+Hint Resolve nf_s.
+
+Theorem step_deterministic : deterministic step.
+  introv Hy1 Hy2.
+  generalize dependent y2; induction Hy1; intros;
+  inverts Hy2; crush; try solve by inversion;
+  match goal with
+    | [ p1 : nvalue ?t, p2 : tsucc ?t ==> _ |- _ ]
+      => exfalso; assert (step_normal_form (tsucc t)) by crush;
+         unfold normal_form in *; nexelim
+    | [ IH : forall t2, ?t ==> t2 -> ?t1 = t2, p : ?t ==> ?t2 |- _]
+      => apply IH in p; crush
+  end.
 Qed.
 (** [] *)
 
@@ -357,13 +346,13 @@ Proof. auto. Qed.
 
 Example has_type_not : 
   ~ (|- tif tfalse tzero ttrue ∈ TBool).
-Proof. intros Contra. solve by inversion 2. Qed.
+Proof. intro; solve by inversion 2. Qed.
 
 (** **** Exercise: 1 star, optional (succ_hastype_nat__hastype_nat) *)
 Example succ_hastype_nat__hastype_nat : ∀ t,
   |- tsucc t ∈ TNat ->
   |- t ∈ TNat.  
-Proof. intros. inversion H. assumption. Qed.
+Proof. inversion 1; crush. Qed.
 (** [] *)
 
 (* ###################################################################### *)
@@ -375,22 +364,11 @@ Proof. intros. inversion H. assumption. Qed.
 
 Lemma bool_canonical : ∀ t,
   |- t ∈ TBool -> value t -> bvalue t.
-Proof.
-  intros t HT HV.
-  inversion HV; auto.
-
-  induction H; inversion HT; auto.
-Qed.
+Proof. repeat inversion 1; crush; solve by inversion. Qed.
 
 Lemma nat_canonical : ∀ t,
   |- t ∈ TNat -> value t -> nvalue t.
-Proof.
-  intros t HT HV.
-  inversion HV.
-  inversion H; subst; inversion HT.   
-
-  auto.  
-Qed.
+Proof. repeat inversion 1; crush; solve by inversion. Qed.
 
 Hint Resolve bool_canonical nat_canonical.
 (* ###################################################################### *)
@@ -398,6 +376,20 @@ Hint Resolve bool_canonical nat_canonical.
 
 (** The typing relation enjoys two critical properties.  The first is
     that well-typed normal forms are values (i.e., not stuck). *)
+
+Ltac destr_prods :=
+  repeat match goal with
+           | [ p : _ /\ _ |- _ ] => destruct p
+           | [ p : exists _, _ |- _ ] => destruct p
+           | [ p : ex _ _ |- _ ] => destruct p
+           | [ p : _ * _ |- _ ] => destruct p
+         end.
+
+Ltac destr_sums :=
+  repeat match goal with
+           | [ p : _ \/ _ |- _ ] => destruct p
+           | [ p : {_} + {_} |- _ ] => destruct p
+         end.
 
 Theorem progress : ∀ t T,
   |- t ∈ T ->
@@ -407,39 +399,17 @@ Theorem progress : ∀ t T,
 (** Complete the formal proof of the [progress] property.  (Make sure
     you understand the informal proof fragment in the following
     exercise before starting -- this will save you a lot of time.) *)
-
-Proof with auto.
-  intros t T HT.
-  has_type_cases (induction HT) Case...
-  (* The cases that were obviously values, like T_True and
-     T_False, were eliminated immediately by auto *)
-  Case "T_If".
-    right. inversion IHHT1; clear IHHT1.
-    SCase "t1 is a value".
-    apply (bool_canonical t1 HT1) in H.
-    inversion H; subst; clear H.
-      exists t2...
-      exists t3...
-    SCase "t1 can take a step".
-      inversion H as [t1' H1].
-      exists (tif t1' t2 t3)...
-  Case "T_Succ".
-    inversion IHHT.
-    SCase "value". left. right. constructor...
-    SCase "stepable". inversion H; subst; clear H. right. exists (tsucc x)...
-  Case "T_Pred".
-    inversion IHHT; right.
-     SCase "value". 
-       apply nat_canonical in H... inversion H; subst; clear H.
-         exists tzero...
-         exists t...
-     SCase "stepable". inversion H; subst; clear H. exists (tpred x)...
-  Case "T_Iszero".
-    inversion IHHT; right; 
-    try apply nat_canonical in H; inversion H; subst; clear H...
-      + exists ttrue...
-      + exists tfalse...
-      + exists (tiszero x)...
+  induction 1; destr_sums; destr_prods; eauto;
+  match goal with
+    | [ p : value ?t, _ : |- ?t ∈ TBool |- _ ] =>
+      apply bool_canonical in p; eauto
+    | [ p : value ?t, _ : |- ?t ∈ TNat |- _ ] =>
+      apply nat_canonical in p; eauto
+  end;
+  match goal with
+    | [ p : bvalue _ |- _ ] => inverts p
+    | [ p : nvalue _ |- _ ] => inverts p
+  end; right; eauto.
 Qed.
 (** [] *)
 
@@ -466,8 +436,8 @@ Qed.
 
             - If [t1] itself can take a step, then, by [ST_If], so can
               [t].
-
-    (* FILL IN HERE *)
+       (* Fill in here *)
+     
 []
 *)
 
@@ -511,26 +481,12 @@ Theorem preservation : ∀ t t' T,
     make sure you understand the informal proof fragment in the
     following exercise first.) *)
 
-Proof with auto.
-  intros t t' T HT HE.
-  generalize dependent t'.
-  has_type_cases (induction HT) Case; 
-         (* every case needs to introduce a couple of things *)
-         intros t' HE; 
-         (* and we can deal with several impossible
-            cases all at once *)
-         try (solve by inversion).
-    Case "T_If". inversion HE; subst; clear HE.
-      SCase "ST_IFTrue". assumption.
-      SCase "ST_IfFalse". assumption.
-      SCase "ST_If". apply T_If; try assumption.
-        apply IHHT1; assumption.
-    Case "T_Succ".
-      inversion HE; subst. apply IHHT in H0...
-    Case "T_Pred".
-      inversion HE; subst...
-      inversion HT...
-      inversion HE; subst...
+Proof. introv Ht Hst;
+       generalize dependent t'; induction Ht; intros; inverts Hst;
+       match goal with
+         | [ p : |- tsucc _ ∈ TNat |- _ ] => inverts p
+         | _ => idtac
+       end; crush.
 Qed.
 (** [] *)
 
@@ -574,19 +530,17 @@ Qed.
     not exactly the same. *)
 
 Theorem nvalue_tnat : forall t, nvalue t -> |- t ∈ TNat.
-Proof with auto. intros. induction H... Qed.
+  induction 1; crush. Qed.
+
+Hint Resolve nvalue_tnat.
+
 Theorem preservation' : ∀ t t' T,
   |- t ∈ T ->
   t ==> t' ->
   |- t' ∈ T.
-Proof with eauto.
-  intros. generalize dependent T. step_cases (induction H0) Case; intros;
-  inversion H; inversion H0; subst...
-  Case "ST_PredSucc".
-    constructor. apply nvalue_tnat...
-Qed.    
+  introv Ht Hst; generalize dependent T; induction Hst; inversion 1; crush. Qed.
 
-Hint Resolve nvalue_tnat.
+Hint Resolve preservation.
 (** [] *)
 
 (* ###################################################################### *)
@@ -598,16 +552,37 @@ Hint Resolve nvalue_tnat.
 Definition multistep := (multi step).
 Notation "t1 '==>*' t2" := (multistep t1 t2) (at level 40).
 
+Ltac notHyp P :=
+  match goal with
+    | [ _ : P |- _ ] => fail 1
+    | _ =>
+      match P with
+        | ?P1 /\ ?P2 => first [ notHyp P1 | notHyp P2 | fail 2 ]
+        | _ => idtac
+      end
+  end.
+
+Ltac extend pf :=
+  let t := type of pf
+  in notHyp t; generalize pf ; intro.
+
+Ltac preservation :=
+  repeat match goal with
+           | [ p1 : |- ?t1 ∈ ?T, p2 : ?t1 ==> ?t2 |- _ ] =>
+             extend (preservation t1 t2 T p1 p2)
+         end.
+
+Ltac prog :=
+  repeat match goal with
+           | [ p : |- ?t ∈ ?T |- _] =>
+             extend (progress t T p)
+         end.
+
 Corollary soundness : ∀ t t' T,
   |- t ∈ T -> 
   t ==>* t' ->
   ~(stuck t').
-Proof. 
-  intros t t' T HT P. induction P; intros [R S].
-  destruct (progress x T HT); auto.   
-  apply IHP.  apply (preservation x y T HT H).
-  unfold stuck. split; auto.   Qed.
-
+  unfold stuck; induction 2; intros; [prog | preservation]; crush. Qed.
 
 (* ###################################################################### *)
 (** * Aside: the [normalize] Tactic *)
@@ -665,7 +640,6 @@ Tactic Notation "normalize" :=
              [ (eauto 10; fail) | (instantiate; simpl)]);
    apply multi_refl.
 
-
 Example astep_example1'' : 
   (APlus (ANum 3) (AMult (ANum 3) (ANum 4))) / empty_state 
   ==>a* (ANum 15).
@@ -706,7 +680,7 @@ Qed.
 Theorem normalize_ex : exists e',
   (AMult (ANum 3) (AMult (ANum 2) (ANum 1))) / empty_state 
   ==>a* e'.
-Proof with normalize. eapply ex_intro... Qed.
+Proof with normalize. eexists... Qed.
 
 (** [] *)
 
@@ -832,7 +806,7 @@ Proof with normalize. econstructor... Qed.
 
 Module nopredzero.
 
-Reserved Notation "t1 '==>' t2" (at level 40).
+Reserved Notation "t1 ==> t2" (at level 40).
 Inductive step : tm -> tm -> Prop :=
   | ST_IfTrue : Π t1 t2, tif ttrue t1 t2 ==> t1
   | ST_IfFalse : Π t1 t2, tif tfalse t1 t2 ==> t2
@@ -843,7 +817,7 @@ Inductive step : tm -> tm -> Prop :=
   | ST_IszeroZero : tiszero tzero ==> ttrue
   | ST_IszeroSucc : Π t, nvalue t -> tiszero (tsucc t) ==> tfalse
   | ST_Iszero : Π t t', t ==> t' -> tiszero t ==> tiszero t'
-where "t1 '==>' t2" := (step t1 t2).
+where "t1 ==> t2" := (step t1 t2).
 
 Tactic Notation "step_cases" tactic(first) ident(c) :=
   first;
@@ -854,28 +828,28 @@ Tactic Notation "step_cases" tactic(first) ident(c) :=
 
 Hint Constructors step.
 
-Reserved Notation "'⊢' t '∈' T" (at level 40).
+Reserved Notation "'|-' t '∈' T" (at level 40).
 
 Inductive has_type : tm -> ty -> Prop :=
   | T_True : 
-       ⊢ ttrue ∈ TBool
+       |- ttrue ∈ TBool
   | T_False : 
-       ⊢ tfalse ∈ TBool
+       |- tfalse ∈ TBool
   | T_If : ∀ t1 t2 t3 T,
-       ⊢ t1 ∈ TBool ->
-       ⊢ t2 ∈ T ->
-       ⊢ t3 ∈ T ->
-       ⊢ tif t1 t2 t3 ∈ T
+       |- t1 ∈ TBool ->
+       |- t2 ∈ T ->
+       |- t3 ∈ T ->
+       |- tif t1 t2 t3 ∈ T
   | T_Zero : 
-       ⊢ tzero ∈ TNat
+       |- tzero ∈ TNat
   | T_Succ : ∀ t1,
-       ⊢ t1 ∈ TNat ->
-       ⊢ tsucc t1 ∈ TNat
+       |- t1 ∈ TNat ->
+       |- tsucc t1 ∈ TNat
   | T_Iszero : ∀ t1,
-       ⊢ t1 ∈ TNat ->
-       ⊢ tiszero t1 ∈ TBool
+       |- t1 ∈ TNat ->
+       |- tiszero t1 ∈ TBool
 
-where "'⊢' t '∈' T" := (has_type t T).
+where "'|-' t '∈' T" := (has_type t T).
 
 Tactic Notation "has_type_cases" tactic(first) ident(c) :=
   first;
@@ -884,62 +858,88 @@ Tactic Notation "has_type_cases" tactic(first) ident(c) :=
 
 Hint Constructors has_type.
 
+Lemma nv_sp : forall t, nvalue t <-> nvalue (tsucc t).
+  split; inversion 1; crush. Qed.
+
+Lemma bool_canonical : forall t, |- t ∈ TBool -> value t -> bvalue t.
+  repeat inversion 1; crush; solve by inversion. Qed.
+
+Lemma nat_canonical : forall t, |- t ∈ TNat -> value t -> nvalue t.
+  repeat inversion 1; crush; solve by inversion. Qed.
+
+Hint Resolve nv_sp nat_canonical bool_canonical.
+
+Ltac bn_canonize :=
+  repeat match goal with
+             [ p1 : |- ?t ∈ ?T, p2 : value ?t |- _ ] =>
+             match T with
+               | TBool => extend (bool_canonical t p1 p2)
+               | TNat => extend (nat_canonical t p1 p2)
+             end
+         end.
+
+Ltac destr_bvals :=
+  repeat match goal with
+           | [ p : bvalue _ |- _ ] => inverts p
+         end.
+
+Lemma tif_ex : forall t1 t2 t3,
+                 |- t1 ∈ TBool ->
+                    (value t1 \/ exists t', t1 ==> t') ->
+                    exists t', tif t1 t2 t3 ==> t'.
+  destruct 2.
+  - bn_canonize; destr_bvals; eauto.
+  - destr_prods; eauto.
+Qed.
+
+Hint Resolve tif_ex.
+
 Theorem progress : Π t T,
-                   ⊢ t ∈ T →
+                   |- t ∈ T →
                    value t \/ ∃ t', t ==> t'.
-Proof with auto.
-  intros. has_type_cases (induction H) Case...
-  Case "T_If". right. inversion IHhas_type1; subst; inversion H2...
-    SCase "value". inversion H3; subst...
-      exists t2...
-      exists t3...
-      solve by inversion 3.
-    SCase "t1 ==> x". exists (tif x t2 t3)...
-  Case "T_Succ". inversion IHhas_type; subst...
-    SCase "value". inversion H0... solve by inversion 3.
-    SCase "stepable". inversion H0. right. exists (tsucc x)...
-  Case "T_Iszero". right. inversion IHhas_type.
-    SCase "value". inversion H0. solve by inversion 3.
-      inversion H1; subst.
-        exists ttrue...
-        exists tfalse...
-    SCase "stepable". inversion H0. exists (tiszero x)...
+  has_type_cases (induction 1) Case; eauto;
+  destr_sums; destr_prods; bn_canonize; eauto.
+  - Case "T_Iszero". right; inverts H1; eauto.
 Qed.
 
-Theorem value_is_nf : Π t, value t → normal_form step t.
-Proof with auto.
-  intros. destruct H; induction H; intro; try solve by inversion 3...
-  + inversion H0. inversion H1; subst. apply IHnvalue. exists t1'...
-Qed.  
-
-Theorem nf_is_value : Π t T, ⊢ t ∈ T → normal_form step t → value t.
-Proof with auto.
-  intros. destruct (progress t T H)... inversion H1; contradiction.
+Lemma nvalue_is_nf : forall t, nvalue t -> normal_form step t.
+  unfold normal_form; induction 1; destruct 1; try solve by inversion.
+  + inverts H0; nexelim.
 Qed.
 
-Lemma tsucc_nf : Π t, nvalue t → Π t', tsucc t ==> t' → False.
-Proof with eauto. 
-  intros. eapply value_is_nf. right... inversion H0; subst. exists t1'...
+Theorem value_is_nf : forall t, value t → normal_form step t.
+  destruct 1; [destr_bvals; intro; solve by inversion 2 | apply nvalue_is_nf; eauto].
 Qed.
+
+Theorem nf_is_value : forall t T, |- t ∈ T → normal_form step t → value t.
+  unfold normal_form; introv Ht; destruct (progress t T Ht); crush. Qed.
+
+Hint Resolve value_is_nf nf_is_value.
+Hint Immediate value_is_nf nf_is_value.
+
+Theorem value_nf : forall t T, |- t ∈ T -> (value t <-> normal_form step t).
+  split; generalize dependent T; generalize dependent t; eauto. Qed.
+
+Hint Rewrite value_nf.
+
+Theorem tsucc_nf : forall t, nvalue t -> forall t', tsucc t ==> t' -> False.
+  induction 1; crush; try solve by inversion 2.
+  - match goal with [p : tsucc _ ==> _ |- _] => inverts p end; eauto.
+Qed.
+
+Hint Resolve tsucc_nf.
 
 Theorem step_deterministic : Π t1 t2 t3,
                              t1 ==> t2 →
                              t1 ==> t3 →
                              t2 = t3.
-Proof with eauto. 
-  intros. generalize dependent t3. 
-  step_cases (induction H) Case; intros; 
-  inversion H0; subst; try solve by inversion...
-  Case "ST_If". apply IHstep in H5; subst...
-  Case "ST_Succ". apply IHstep in H2. subst...
-  Case "ST_PredSucc". exfalso. eapply tsucc_nf...
-  Case "ST_Pred".
-    SCase "ST_PredSucc". exfalso. eapply tsucc_nf...
-    SCase "ST_Pred". erewrite IHstep. reflexivity. assumption.
-  Case "ST_IszeroSucc". inversion H0; subst... exfalso. eapply tsucc_nf...
-  Case "ST_Iszero".
-    SCase "ST_IszeroSucc". exfalso. eapply tsucc_nf...
-    SCase "ST_Iszero". erewrite IHstep...
+  introv Hst2 Hst3; generalize dependent t3; induction Hst2; intros;
+  inverts Hst3; eauto; try (exfalso; eauto; solve by inversion);
+  match goal with
+    | [ IH : forall t2, ?t ==> t2 -> ?t1 = t2,
+          p : ?t ==> ?t2 |- _ ] => apply IH in p; crush
+    | _ => idtac
+  end.
 Qed.
 
 End nopredzero.
