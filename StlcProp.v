@@ -1,7 +1,6 @@
 (** * StlcProp: Properties of STLC *)
 
 Require Export Stlc.
-Require Export LibTactics.
 Module STLCProp.
 Import STLC.
 
@@ -13,16 +12,16 @@ Import STLC.
 (** * Canonical Forms *)
 
 Lemma canonical_forms_bool : forall t,
-  empty |- t ∈ TBool ->
+  empty ⊢ t ∈ TBool ->
   value t ->
   (t = ttrue) \/ (t = tfalse).
 Proof. repeat inversion 1; crush. Qed.
 
 Lemma canonical_forms_fun : forall t T1 T2,
-  empty |- t ∈ (TArrow T1 T2) ->
+  empty ⊢ t ∈ (TArrow T1 T2) ->
   value t ->
   exists x u, t = tabs x T1 u.
-Proof. introv Ht HVal; inverts HVal; inverts Ht. exists x0 t0; crush. Qed.
+Proof. introv Ht HVal; inverts HVal; inverts Ht; eauto. Qed.
 
 (* ###################################################################### *)
 (** * Progress *)
@@ -34,10 +33,10 @@ Proof. introv Ht HVal; inverts HVal; inverts Ht. exists x0 t0; crush. Qed.
     [Types] chapter. *)
 
 Theorem progress : forall t T, 
-     empty |- t ∈ T ->
+     empty ⊢ t ∈ T ->
      value t \/ exists t', t ==> t'.
 
-(** _Proof_: by induction on the derivation of [|- t ∈ T].
+(** _Proof_: by induction on the derivation of [⊢ t ∈ T].
 
     - The last rule of the derivation cannot be [T_Var], since a
       variable is never well typed in an empty context.
@@ -48,7 +47,7 @@ Theorem progress : forall t T,
     - If the last rule of the derivation was [T_App], then [t = t1
       t2], and we know that [t1] and [t2] are also well typed in the
       empty context; in particular, there exists a type [T2] such that
-      [|- t1 ∈ T2 -> T] and [|- t2 ∈ T2].  By the induction
+      [⊢ t1 ∈ T2 -> T] and [⊢ t2 ∈ T2].  By the induction
       hypothesis, either [t1] is a value or it can take an evaluation
       step.
 
@@ -77,41 +76,14 @@ Theorem progress : forall t T,
           [ST_If]).
 *)
 
-Proof with eauto.
+Proof.
   introv Ht.
-  remember (@empty ty) as Gamma.
-  has_type_cases (induction Ht) Case; subst Gamma...
-  Case "T_Var".
-    (* contradictory: variables cannot be typed in an 
-       empty context *)
-    inversion H. 
-
-  Case "T_App". 
-    (* [t] = [t1 t2].  Proceed by cases on whether [t1] is a 
-       value or steps... *)
-    right. destruct IHHt1...
-    SCase "t1 is a value".
-      destruct IHHt2...
-      SSCase "t2 is also a value".
-        assert (exists x0 t0, t1 = tabs x0 T11 t0).
-        eapply canonical_forms_fun; eauto.
-        destruct H1 as [x0 [t0 Heq]]. subst.
-        exists ([x0:=t2]t0)...
-
-      SSCase "t2 steps".
-        inversion H0 as [t2' Hstp]. exists (tapp t1 t2')...
-
-    SCase "t1 steps".
-      inversion H as [t1' Hstp]. exists (tapp t1' t2)...
-
-  Case "T_If".
-    right. destruct IHHt1...
-    
-    SCase "t1 is a value".
-      destruct (canonical_forms_bool t1); subst; eauto.
-
-    SCase "t1 also steps".
-      inversion H as [t1' Hstp]. exists (tif t1' t2 t3)...
+  remember (@empty ty) as Gamma;
+  has_type_cases (induction Ht) Case; subst; eauto; eauto;
+  firstorder; try solve by inversion;
+  repeat match goal with
+             [p1 : value ?t, p2 : _ ⊢ ?t ∈ _ |- _] => inverts p1; inverts p2
+         end; eauto.
 Qed.
 
 (** **** Exercise: 3 stars, optional (progress_from_term_ind) *)
@@ -119,23 +91,18 @@ Qed.
     instead of induction on typing derivations. *)
 
 Theorem progress' : forall t T,
-     empty |- t ∈ T ->
+     empty ⊢ t ∈ T ->
      value t \/ exists t', t ==> t'.
 Proof.
-  t_cases (induction t) Case; introv Ht; auto; inverts Ht as Ht1 Ht2 Ht3; crush.
-  - Case "tvar". inverts Ht1.
-  - Case "tapp". right.
-    destruct (IHt1 _ Ht1) as [vt1|st1].
-    + destruct (IHt2 _ Ht2) as [vt2|st2].
-      * inverts vt1; inverts Ht1. exists ([x0 := t2] t); crush.
-      * inverts st2. exists (tapp t1 x0); crush.
-    + inverts st1. exists (tapp x0 t2); crush.
-  - Case "tif". right.
-    destruct (IHt1 _ Ht1) as [vt1|st1].
-    + inverts vt1; inverts Ht1; [exists t2 | exists t3]; crush.
-    + inverts st1. exists (tif x0 t2 t3); crush.
-Qed.  
-
+  t_cases (induction t) Case; introv Ht; auto; inverts Ht as Ht1 Ht2 Ht3;
+  try solve by inversion; right;
+  repeat match goal with
+             [ IH : forall T, empty ⊢ ?t ∈ T → value ?t1 \/ exists t', ?t ==> t',
+                p : empty ⊢ ?t ∈ ?T |- _] => extend (IH T p)
+         end; destr_sums; destr_prods;
+  repeat match goal with
+             [ p1 : value ?t, p2 : _ ⊢ ?t ∈ _ |- _ ] => inverts p1; inverts p2                        end; eauto.
+Qed.
 (** [] *)
 
 (* ###################################################################### *)
@@ -233,7 +200,7 @@ Definition closed (t:tm) :=
 
 Lemma free_in_context : forall x t T Gamma,
    appears_free_in x t ->
-   Gamma |- t ∈ T ->
+   Gamma ⊢ t ∈ T ->
    exists T', Gamma x = Some T'.
 
 (** _Proof_: We show, by induction on the proof that [x] appears free
@@ -265,32 +232,32 @@ Lemma free_in_context : forall x t T Gamma,
         assigns a type to [x], we appeal to lemma [extend_neq], noting
         that [x] and [y] are different variables. *)
 
-Proof.
-  intros x t T Gamma H H0. generalize dependent Gamma. 
-  generalize dependent T. 
-  afi_cases (induction H) Case; 
-         intros; try solve [inversion H0; eauto].
-  Case "afi_abs".
-    inversion H1; subst.
-    apply IHappears_free_in in H7.
-    rewrite extend_neq in H7; assumption.
+Proof. introv Hafi Ht.
+       generalize dependent Gamma; generalize dependent T;
+       afi_cases (induction Hafi) Case; inversion 1; eauto;
+       match goal with
+         | [ IH : forall T Gamma, Gamma ⊢ ?t ∈ T ->
+                                  exists T', Gamma ?x = Some T',
+              H : ?Gamma ⊢ ?t ∈ ?T |- _ ]
+           => destruct (IH T Gamma H)
+       end; erewrite <- extend_neq; eauto.
 Qed.
 
 Hint Resolve free_in_context.
 (** Next, we'll need the fact that any term [t] which is well typed in
     the empty context is closed -- that is, it has no free variables. *)
 
+Lemma neg_lift : forall X Y : Prop, (X -> Y) -> ~ Y -> ~ X. eauto. Qed.
+
 (** **** Exercise: 2 stars, optional (typable_empty__closed) *)
 Corollary typable_empty__closed : forall t T, 
-    empty |- t ∈ T  ->
+    empty ⊢ t ∈ T  ->
     closed t.
-Proof. introv Ht; intros v Hc.
-       eapply free_in_context in Hc; [| eassumption]; crush. inverts H.
-Qed.    
+  intros; intros c Hc; eapply free_in_context in Hc; eauto; solve by inversion 2. Qed.
 
 (** [] *)
 
-(** Sometimes, when we have a proof [Gamma |- t : T], we will need to
+(** Sometimes, when we have a proof [Gamma ⊢ t : T], we will need to
     replace [Gamma] by a different context [Gamma'].  When is it safe
     to do this?  Intuitively, it must at least be the case that
     [Gamma'] assigns the same types as [Gamma] to all the variables
@@ -298,26 +265,26 @@ Qed.
     is needed. *)
 
 Lemma context_invariance : forall Gamma Gamma' t T,
-     Gamma |- t ∈ T  ->
+     Gamma ⊢ t ∈ T  ->
      (forall x, appears_free_in x t -> Gamma x = Gamma' x) ->
-     Gamma' |- t ∈ T.
+     Gamma' ⊢ t ∈ T.
 
-(** _Proof_: By induction on the derivation of [Gamma |- t ∈ T].
+(** _Proof_: By induction on the derivation of [Gamma ⊢ t ∈ T].
 
       - If the last rule in the derivation was [T_Var], then [t = x]
         and [Gamma x = T].  By assumption, [Gamma' x = T] as well, and
-        hence [Gamma' |- t ∈ T] by [T_Var].
+        hence [Gamma' ⊢ t ∈ T] by [T_Var].
 
       - If the last rule was [T_Abs], then [t = \y:T11. t12], with [T
-        = T11 -> T12] and [Gamma, y:T11 |- t12 ∈ T12].  The induction
+        = T11 -> T12] and [Gamma, y:T11 ⊢ t12 ∈ T12].  The induction
         hypothesis is that for any context [Gamma''], if [Gamma,
         y:T11] and [Gamma''] assign the same types to all the free
         variables in [t12], then [t12] has type [T12] under [Gamma''].
         Let [Gamma'] be a context which agrees with [Gamma] on the
-        free variables in [t]; we must show [Gamma' |- \y:T11. t12 ∈
+        free variables in [t]; we must show [Gamma' ⊢ \y:T11. t12 ∈
         T11 -> T12].
 
-        By [T_Abs], it suffices to show that [Gamma', y:T11 |- t12 ∈
+        By [T_Abs], it suffices to show that [Gamma', y:T11 ⊢ t12 ∈
         T12].  By the IH (setting [Gamma'' = Gamma', y:T11]), it
         suffices to show that [Gamma, y:T11] and [Gamma', y:T11] agree
         on all the variables that appear free in [t12].  
@@ -330,8 +297,8 @@ Lemma context_invariance : forall Gamma Gamma' t T,
         agree on all such variables, and hence so do [Gamma, y:T11]
         and [Gamma', y:T11].
 
-      - If the last rule was [T_App], then [t = t1 t2], with [Gamma |-
-        t1 ∈ T2 -> T] and [Gamma |- t2 ∈ T2].  One induction
+      - If the last rule was [T_App], then [t = t1 t2], with [Gamma ⊢
+        t1 ∈ T2 -> T] and [Gamma ⊢ t2 ∈ T2].  One induction
         hypothesis states that for all contexts [Gamma'], if [Gamma']
         agrees with [Gamma] on the free variables in [t1], then [t1]
         has type [T2 -> T] under [Gamma']; there is a similar IH for
@@ -374,18 +341,18 @@ Qed.
     able to substitute [v] for each of the occurrences of [x] in [t]
     and obtain a new term that still has type [T]. *)
 
-(** _Lemma_: If [Gamma,x:U |- t ∈ T] and [|- v ∈ U], then [Gamma |-
+(** _Lemma_: If [Gamma,x:U ⊢ t ∈ T] and [⊢ v ∈ U], then [Gamma ⊢
     [x:=v]t ∈ T]. *)
 
 Lemma substitution_preserves_typing : forall Gamma x U t v T,
-     extend Gamma x U |- t ∈ T ->
-     empty |- v ∈ U   ->
-     Gamma |- [x:=v]t ∈ T.
+     extend Gamma x U ⊢ t ∈ T ->
+     empty ⊢ v ∈ U   ->
+     Gamma ⊢ [x:=v]t ∈ T.
 
 (** One technical subtlety in the statement of the lemma is that we
     assign [v] the type [U] in the _empty_ context -- in other words,
     we assume [v] is closed.  This assumption considerably simplifies
-    the [T_Abs] case of the proof (compared to assuming [Gamma |- v ∈
+    the [T_Abs] case of the proof (compared to assuming [Gamma ⊢ v ∈
     U], which would be the other reasonable assumption at this point)
     because the context invariance lemma then tells us that [v] has
     type [U] in any context at all -- we don't have to worry about
@@ -393,13 +360,13 @@ Lemma substitution_preserves_typing : forall Gamma x U t v T,
     into the context by [T_Abs].
 
     _Proof_: We prove, by induction on [t], that, for all [T] and
-    [Gamma], if [Gamma,x:U |- t ∈ T] and [|- v ∈ U], then [Gamma |-
+    [Gamma], if [Gamma,x:U ⊢ t ∈ T] and [⊢ v ∈ U], then [Gamma ⊢
     [x:=v]t ∈ T].
  
       - If [t] is a variable, there are two cases to consider, depending
         on whether [t] is [x] or some other variable.
 
-          - If [t = x], then from the fact that [Gamma, x:U |- x ∈ T] we
+          - If [t = x], then from the fact that [Gamma, x:U ⊢ x ∈ T] we
             conclude that [U = T].  We must show that [[x:=v]x = v] has
             type [T] under [Gamma], given the assumption that [v] has
             type [U = T] under the empty context.  This follows from
@@ -411,25 +378,25 @@ Lemma substitution_preserves_typing : forall Gamma x U t v T,
             x:U] as under [Gamma].
 
       - If [t] is an abstraction [\y:T11. t12], then the IH tells us,
-        for all [Gamma'] and [T'], that if [Gamma',x:U |- t12 ∈ T']
-        and [|- v ∈ U], then [Gamma' |- [x:=v]t12 ∈ T'].
+        for all [Gamma'] and [T'], that if [Gamma',x:U ⊢ t12 ∈ T']
+        and [⊢ v ∈ U], then [Gamma' ⊢ [x:=v]t12 ∈ T'].
 
         The substitution in the conclusion behaves differently,
         depending on whether [x] and [y] are the same variable name.
 
         First, suppose [x = y].  Then, by the definition of
-        substitution, [[x:=v]t = t], so we just need to show [Gamma |-
-        t ∈ T].  But we know [Gamma,x:U |- t : T], and since the
+        substitution, [[x:=v]t = t], so we just need to show [Gamma ⊢
+        t ∈ T].  But we know [Gamma,x:U ⊢ t : T], and since the
         variable [y] does not appear free in [\y:T11. t12], the
-        context invariance lemma yields [Gamma |- t ∈ T].
+        context invariance lemma yields [Gamma ⊢ t ∈ T].
 
-        Second, suppose [x <> y].  We know [Gamma,x:U,y:T11 |- t12 ∈
+        Second, suppose [x <> y].  We know [Gamma,x:U,y:T11 ⊢ t12 ∈
         T12] by inversion of the typing relation, and [Gamma,y:T11,x:U
-        |- t12 ∈ T12] follows from this by the context invariance
-        lemma, so the IH applies, giving us [Gamma,y:T11 |- [x:=v]t12 ∈
-        T12].  By [T_Abs], [Gamma |- \y:T11. [x:=v]t12 ∈ T11->T12], and
+        ⊢ t12 ∈ T12] follows from this by the context invariance
+        lemma, so the IH applies, giving us [Gamma,y:T11 ⊢ [x:=v]t12 ∈
+        T12].  By [T_Abs], [Gamma ⊢ \y:T11. [x:=v]t12 ∈ T11->T12], and
         by the definition of substitution (noting that [x <> y]),
-        [Gamma |- \y:T11. [x:=v]t12 ∈ T11->T12] as required.
+        [Gamma ⊢ \y:T11. [x:=v]t12 ∈ T11->T12] as required.
 
       - If [t] is an application [t1 t2], the result follows
         straightforwardly from the definition of substitution and the
@@ -440,7 +407,7 @@ Lemma substitution_preserves_typing : forall Gamma x U t v T,
     Another technical note: This proof is a rare case where an
     induction on terms, rather than typing derivations, yields a
     simpler argument.  The reason for this is that the assumption
-    [extend Gamma x U |- t ∈ T] is not completely generic, in
+    [extend Gamma x U ⊢ t ∈ T] is not completely generic, in
     the sense that one of the "slots" in the typing relation -- namely
     the context -- is not just a variable, and this means that Coq's
     native induction tactic does not give us the induction hypothesis
@@ -498,11 +465,11 @@ Qed.
 *)
 
 Theorem preservation : forall t t' T,
-     empty |- t ∈ T  ->
+     empty ⊢ t ∈ T  ->
      t ==> t'  ->
-     empty |- t' ∈ T.
+     empty ⊢ t' ∈ T.
 
-(** _Proof_: by induction on the derivation of [|- t ∈ T].
+(** _Proof_: by induction on the derivation of [⊢ t ∈ T].
 
     - We can immediately rule out [T_Var], [T_Abs], [T_True], and
       [T_False] as the final rules in the derivation, since in each of
@@ -550,7 +517,7 @@ Proof with eauto.
 Qed.
 
 Lemma multipreservation : forall t t' T,
-                            empty |- t ∈ T -> t ==>* t' -> empty |- t' ∈ T.
+                            empty ⊢ t ∈ T -> t ==>* t' -> empty ⊢ t' ∈ T.
 Proof. intros. induction H0; intros; auto.
        apply IHmulti. eapply preservation with (t := x0); assumption.
 Qed.       
@@ -561,7 +528,7 @@ Qed.
     expansion property for the simple language of arithmetic and
     boolean expressions.  Does this property hold for STLC?  That is,
     is it always the case that, if [t ==> t'] and [has_type t' T],
-    then [empty |- t ∈ T]?  If so, prove it.  If not, give a
+    then [empty ⊢ t ∈ T]?  If so, prove it.  If not, give a
     counter-example not involving conditionals.
 
 []
@@ -585,7 +552,7 @@ Definition stuck (t:tm) : Prop :=
 Hint Resolve multipreservation.
 
 Corollary soundness : forall t t' T,
-  empty |- t ∈ T -> 
+  empty ⊢ t ∈ T -> 
   t ==>* t' ->
   ~(stuck t').
 Proof with eauto.
@@ -609,7 +576,7 @@ Qed.
     type. *)
 (** Formalize this statement and prove it. *)
 
-Theorem unique : forall t Gamma T T', Gamma |- t ∈ T -> Gamma |- t ∈ T' -> T = T'.
+Theorem unique : forall t Gamma T T', Gamma ⊢ t ∈ T -> Gamma ⊢ t ∈ T' -> T = T'.
 Proof with eauto.
   introv Ht1 Ht2; generalize dependent T'.
   has_type_cases (induction Ht1) Case; intros; inverts Ht2; crush...
@@ -631,7 +598,7 @@ Qed.
 
 Definition app : forall {A} (a : A) {P : A -> Type}, (forall a, P a) -> P a. auto. Defined.
 
-Theorem progress'' : forall t T, empty |- t ∈ T -> value t \/ exists t', t ==> t'.
+Theorem progress'' : forall t T, empty ⊢ t ∈ T -> value t \/ exists t', t ==> t'.
 Proof with eauto.
   introv Ht; remember (@empty ty); symmetry in Heqp;
   has_type_cases (induction Ht) Case; induction Heqp;
@@ -648,7 +615,7 @@ Proof with eauto.
     inverts IHHt1; inverts H; inverts Ht1...
 Qed.
 
-Theorem  preservation'' : forall t t' T, empty |- t ∈ T -> t ==> t' -> empty |- t' ∈ T.
+Theorem  preservation'' : forall t t' T, empty ⊢ t ∈ T -> t ==> t' -> empty ⊢ t' ∈ T.
 Proof with eauto.
   introv Ht eval; generalize dependent t'; remember (@empty ty); symmetry in Heqp;
   has_type_cases (induction Ht) Case; intros; subst; inverts eval; inverts Ht1...
@@ -661,7 +628,7 @@ Qed.
                          t ==> zap
 and the following typing rule:
                       ----------------               (T_Zap)
-                      Gamma |- zap : T
+                      Gamma ⊢ zap : T
     Which of the following properties of the STLC remain true in
     the presence of this rule?  For each one, write either
     "remains true" or else "becomes false." If a property becomes
@@ -736,10 +703,10 @@ and the following typing rule:
 
 (** **** Exercise: 2 stars, optional (stlc_variation5) *)
 (** Suppose instead that we add the following new rule to the typing relation:
-                 Gamma |- t1 ∈ Bool->Bool->Bool
-                     Gamma |- t2 ∈ Bool
+                 Gamma ⊢ t1 ∈ Bool->Bool->Bool
+                     Gamma ⊢ t2 ∈ Bool
                  ------------------------------          (T_FunnyApp)
-                    Gamma |- t1 t2 ∈ Bool
+                    Gamma ⊢ t1 t2 ∈ Bool
     Which of the following properties of the STLC remain true in
     the presence of this rule?  For each one, write either
     "remains true" or else "becomes false." If a property becomes
@@ -755,10 +722,10 @@ and the following typing rule:
 
 (** **** Exercise: 2 stars, optional (stlc_variation6) *)
 (** Suppose instead that we add the following new rule to the typing relation:
-                     Gamma |- t1 ∈ Bool
-                     Gamma |- t2 ∈ Bool
+                     Gamma ⊢ t1 ∈ Bool
+                     Gamma ⊢ t2 ∈ Bool
                     ---------------------               (T_FunnyApp')
-                    Gamma |- t1 t2 ∈ Bool
+                    Gamma ⊢ t1 t2 ∈ Bool
     Which of the following properties of the STLC remain true in
     the presence of this rule?  For each one, write either
     "remains true" or else "becomes false." If a property becomes
@@ -776,7 +743,7 @@ and the following typing rule:
 (** Suppose we add the following new rule to the typing
     relation of the STLC:
                          ------------------- (T_FunnyAbs)
-                         |- \x:Bool.t ∈ Bool
+                         ⊢ \x:Bool.t ∈ Bool
     Which of the following properties of the STLC remain true in
     the presence of this rule?  For each one, write either
     "remains true" or else "becomes false." If a property becomes

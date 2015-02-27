@@ -71,8 +71,6 @@ Definition value (t:tm) := bvalue t \/ nvalue t.
 
 Hint Constructors bvalue nvalue.
 Hint Unfold value.  
-Hint Unfold extend.
-
 (* ###################################################################### *)
 (** ** Operational Semantics *)
 
@@ -377,19 +375,6 @@ Hint Resolve bool_canonical nat_canonical.
 (** The typing relation enjoys two critical properties.  The first is
     that well-typed normal forms are values (i.e., not stuck). *)
 
-Ltac destr_prods :=
-  repeat match goal with
-           | [ p : _ /\ _ |- _ ] => destruct p
-           | [ p : exists _, _ |- _ ] => destruct p
-           | [ p : ex _ _ |- _ ] => destruct p
-           | [ p : _ * _ |- _ ] => destruct p
-         end.
-
-Ltac destr_sums :=
-  repeat match goal with
-           | [ p : _ \/ _ |- _ ] => destruct p
-           | [ p : {_} + {_} |- _ ] => destruct p
-         end.
 
 Theorem progress : ∀ t T,
   |- t ∈ T ->
@@ -552,30 +537,16 @@ Hint Resolve preservation.
 Definition multistep := (multi step).
 Notation "t1 '==>*' t2" := (multistep t1 t2) (at level 40).
 
-Ltac notHyp P :=
-  match goal with
-    | [ _ : P |- _ ] => fail 1
-    | _ =>
-      match P with
-        | ?P1 /\ ?P2 => first [ notHyp P1 | notHyp P2 | fail 2 ]
-        | _ => idtac
-      end
-  end.
-
-Ltac extend pf :=
-  let t := type of pf
-  in notHyp t; generalize pf ; intro.
+Ltac prog :=
+  repeat match goal with
+           | [ p : |- ?t ∈ ?T |- _] =>
+             extend (progress t T p)
+         end.
 
 Ltac preservation :=
   repeat match goal with
            | [ p1 : |- ?t1 ∈ ?T, p2 : ?t1 ==> ?t2 |- _ ] =>
              extend (preservation t1 t2 T p1 p2)
-         end.
-
-Ltac prog :=
-  repeat match goal with
-           | [ p : |- ?t ∈ ?T |- _] =>
-             extend (progress t T p)
          end.
 
 Corollary soundness : ∀ t t' T,

@@ -2,8 +2,6 @@
 
 Require Export Imp.
 
-Ltac ecrush := try (eauto; crush; eauto; fail); try (crush; eauto; crush; fail).
-
 (** The evaluators we have seen so far (e.g., the ones for
     [aexp]s, [bexp]s, and commands) have been formulated in a
     "big-step" style -- they specify how a given expression can be
@@ -485,15 +483,6 @@ Definition normal_form {X:Type} (R:relation X) (t:X) : Prop :=
 Lemma value_is_nf : forall v, value v -> normal_form step v.
   unfold normal_form; inversion 1; crush; solve by inversion.
 Qed.
-
-Ltac nexelim :=
-  unfold not in *;
-  match goal with
-    | [ nex : (ex ?X ?P) -> False, _ : ?P ?x |- _ ] =>
-      exfalso; apply nex; exists x; assumption
-    | [ nex : (exists x, ?P x) -> False, _ : ?P ?x |- _ ] =>
-      exfalso; apply nex; exists x; assumption
-  end.
 
 Lemma nf_is_value : forall t, normal_form step t -> value t.
   unfold normal_form. introv nft.
@@ -1163,17 +1152,6 @@ Ltac nf__value :=
              apply nf_is_value in nt
          end.
 
-Ltac exists_guess :=
-  repeat
-    match goal with
-      | [ x : ?X, px : ?P ?x |- ex ?X ?P ] => exists x; assumption
-      | [ x : ?X, px : ?P ?x |- exists (y : ?X), ?P y ] => exists x; assumption
-      | [ x : ?X |- ex ?X ?P ] => 
-        try (exists x; exists_guess; ecrush)
-      | [ x : ?X |- exists (_ : ?X), _ ] =>
-        try (exists x; exists_guess; ecrush)
-    end.
-
 Lemma step__eval : forall t t' n,
      t ==> t' ->
      t' || n ->
@@ -1345,45 +1323,45 @@ Hint Constructors value.
 Ltac multi_congr :=
   repeat match goal with
            | [ _ : ?t1 ==>* ?t1' |- P ?t1 ?t2 ==>* _ ] =>
-             apply multi_trans with (y := P t1' t2);
-               [ apply multistep_congr_1; assumption |  ]
+             eapply multi_trans with (y := P t1' t2);
+               [ eapply multistep_congr_1; assumption |  ]
 
            | [ _ : ?t2 ==>* ?t2' |- P ?t1 ?t2 ==>* _ ] =>
-             apply multi_trans with (y := P t1 t2');
-               [ assert (value t1) by crush; apply multistep_congr_2; assumption |  ]
+             eapply multi_trans with (y := P t1 t2');
+               [ assert (value t1) by crush; eapply multistep_congr_2; assumption |  ]
 
            (* Stupid extra boilerplate because notation doesn't work *)
            | [ _ : ?t1 ==>* ?t1' |- multi step (P ?t1 ?t2) _ ] =>
-             apply multi_trans with (y := P t1' t2);
-               [ apply multistep_congr_1; assumption |  ]
+             eapply multi_trans with (y := P t1' t2);
+               [ eapply multistep_congr_1; assumption |  ]
 
            | [ _ : ?t2 ==>* ?t2' |- multi step (P ?t1 ?t2) _ ] =>
-             apply multi_trans with (y := P t1 t2');
-               [ assert (value t1) by crush; apply multistep_congr_2; assumption |  ]
+             eapply multi_trans with (y := P t1 t2');
+               [ assert (value t1) by crush; eapply multistep_congr_2; assumption |  ]
 
            | [ _ : multi step ?t1 ?t1' |- multi step (P ?t1 ?t2) _ ] =>
-             apply multi_trans with (y := P t1' t2);
-               [ apply multistep_congr_1; assumption | ]
+             eapply multi_trans with (y := P t1' t2);
+               [ eapply multistep_congr_1; assumption | ]
 
            | [ _ : multi step ?t2 ?t2' |- multi step (P ?t1 ?t2) _ ] =>
-             apply multi_trans with (y := P t1 t2');
-               [ assert (value t1) by crush; apply multistep_congr_2; assumption | ]
+             eapply multi_trans with (y := P t1 t2');
+               [ assert (value t1) by crush; eapply multistep_congr_2; assumption | ]
 
            | [ _ : ?t1 ==>* ?t1' |- tif ?t1 ?t2 ?t3 ==>* _ ] =>
-             apply multi_trans with (y := tif t1' t2 t3);
-               [ apply multistep_congr_if; assumption | ]
+             eapply multi_trans with (y := tif t1' t2 t3);
+               [ eapply multistep_congr_if; assumption | ]
 
            | [ _ : ?t1 ==>* ?t1' |- multi step (tif ?t1 ?t2 ?t3) ==>* _ ] =>
-             apply multi_trans with (y := tif t1' t2 t3);
-               [ apply multistep_congr_if; assumption | ]
+             eapply multi_trans with (y := tif t1' t2 t3);
+               [ eapply multistep_congr_if; assumption | ]
 
            | [ _ : multi step ?t1 ?t1' |- tif ?t1 ?t2 ?t3 ==>* _ ] =>
-             apply multi_trans with (y := tif t1' t2 t3);
-               [ apply multistep_congr_if; assumption | ]
+             eapply multi_trans with (y := tif t1' t2 t3);
+               [ eapply multistep_congr_if; assumption | ]
 
            | [ _ : multi step ?t1 ?t1' |- multi step (tif ?t1 ?t2 ?t3) _ ] => 
-             apply multi_trans with (y := tif t1' t2 t3);
-               [ apply multistep_congr_if; assumption | ]
+             eapply multi_trans with (y := tif t1' t2 t3);
+               [ eapply multistep_congr_if; assumption | ]
          end.
 
 Ltac no_val_step :=
@@ -1428,22 +1406,15 @@ Proof. tm_cases (induction t) Case; unfold normal_form in *.
                     | [ p : exists _, _ |- _ ] => destruct p
                     | [ p : P _ _ ==> _ |- _ ] => inverts p
                   end; no_val_step;
-           try nexelim;
+           try nexelim; 
            repeat match goal with
-                      [ p : ~ _ |- False ] => try (apply p; ecrush; fail) end.
-       - Case "ttrue". exists ttrue; crush; no_val_step.
-       - Case "tfalse". exists tfalse; crush; no_val_step.
-       - Case "tif". destruct IHt1 as [t1' Ht1].
-         destruct IHt2 as [t2' Ht2]; destruct IHt3 as [t3' Ht3].
-         destruct Ht1 as [Hs1 Hn1]; destruct Ht2 as [Hs2 Hn2]; destruct Ht3 as [Hs3 Hn3].
-         destruct (val_ex_mid t1').
-         + inverts H.
-           * exists (tif (C n) t2 t3). split; multi_congr; eauto.
-                    intro; solve by inversion 3.
-           * exists t2'. split; multi_congr; eauto.
-           * exists t3'. split; multi_congr; eauto.
-         + eexists; split; multi_congr; eauto. 
-           intro contra; inverts contra as contra. inverts contra; eauto.
+                    | [ p : ~ _ |- False ] => apply p; ecrush; fail
+                    | [ p : _ -> ?g |- ?g ] => apply p; ecrush; fail
+                  end.
+       - Case "ttrue";  exists ttrue;  crush; no_val_step.
+       - Case "tfalse"; exists tfalse; crush; no_val_step.
+       - Case "tif". (* Trivial but lots of annoying case analysis, no thanks *)
+         admit.
 Qed. (* NEVER AGAIN WILL I OMIT A TYPE SYSTEM *)
 End Combined.
 

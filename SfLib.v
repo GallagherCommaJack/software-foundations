@@ -319,3 +319,54 @@ Notation "'Π' x .. y , P" := (forall x, .. (forall y, P) ..)
   (at level 200, x binder, y binder, right associativity) : type_scope.
 
 Notation "A → B" := (forall (_ : A) , B) (at level 99, right associativity).
+
+(* Tactics *)
+Ltac ecrush := try (eauto; crush; eauto; fail); try (crush; eauto; crush; fail).
+
+Ltac nexelim :=
+  unfold not in *;
+  match goal with
+    | [ nex : (ex ?X ?P) -> False, _ : ?P ?x |- _ ] =>
+      exfalso; apply nex; exists x; assumption
+    | [ nex : (exists x, ?P x) -> False, _ : ?P ?x |- _ ] =>
+      exfalso; apply nex; exists x; assumption
+  end.
+
+Ltac exists_guess :=
+  repeat
+    match goal with
+      | [ x : ?X, px : ?P ?x |- ex ?X ?P ] => exists x; assumption
+      | [ x : ?X, px : ?P ?x |- exists (y : ?X), ?P y ] => exists x; assumption
+      | [ x : ?X |- ex ?X ?P ] => 
+        try (exists x; exists_guess; ecrush)
+      | [ x : ?X |- exists (_ : ?X), _ ] =>
+        try (exists x; exists_guess; ecrush)
+    end.
+
+Ltac destr_prods :=
+  repeat match goal with
+           | [ p : _ /\ _ |- _ ] => destruct p
+           | [ p : exists _, _ |- _ ] => destruct p
+           | [ p : ex _ _ |- _ ] => destruct p
+           | [ p : _ * _ |- _ ] => destruct p
+         end.
+
+Ltac destr_sums :=
+  repeat match goal with
+           | [ p : _ \/ _ |- _ ] => destruct p
+           | [ p : {_} + {_} |- _ ] => destruct p
+         end.                                                                  
+
+Ltac notHyp P :=
+  match goal with
+    | [ _ : P |- _ ] => fail 1
+    | _ =>
+      match P with
+        | ?P1 /\ ?P2 => first [ notHyp P1 | notHyp P2 | fail 2 ]
+        | _ => idtac
+      end
+  end.
+
+Ltac extend pf :=
+  let t := type of pf
+  in notHyp t; generalize pf ; intro.

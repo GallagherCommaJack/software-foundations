@@ -414,14 +414,14 @@ Qed.
 Theorem eq_tm_dec : forall (t1 t2 : tm), {t1 = t2} + {t1 <> t2}.
 Proof. induction t1; destruct t2; try (left; reflexivity); try (right; discriminate).
        (* All that's left are cases with the same constructors *)
-       - Case "id". destruct (eq_id_dec i i0); [left | right]; crush.
-       - Case "tapp".
+       - Case "id"; destruct (eq_id_dec i i0); [left | right]; crush.
+       - Case "tapp";
          destruct (IHt1_1 t2_1), (IHt1_2 t2_2); [left | right | right | right ]; crush.
-       - Case "tabs".
+       - Case "tabs";
          destruct (IHt1 t2), (eq_ty_dec t t0), (eq_id_dec i i0);
            [ left | right | right | right | right | right | right | right ];
            subst; eauto; injection 1; crush.
-       - Case "tif".
+       - Case "tif";
          destruct (IHt1_1 t2_1), (IHt1_2 t2_2), (IHt1_3 t2_3);
            [ left | right | right | right | right | right | right | right ];
            subst; eauto; injection 1; crush.
@@ -634,7 +634,7 @@ Proof. repeat econstructor. Qed.
     variables.
 
     This leads us to a three-place "typing judgment", informally
-    written [Gamma |- t ∈ T], where [Gamma] is a
+    written [Gamma ⊢ t ∈ T], where [Gamma] is a
     "typing context" -- a mapping from variables to their types. *)
 
 (** We hide the definition of partial maps in a module since it is
@@ -676,57 +676,57 @@ Definition context := partial_map ty.
 (** 
                              Gamma x = T
                             --------------                              (T_Var)
-                            Gamma |- x ∈ T
+                            Gamma ⊢ x ∈ T
 
-                      Gamma , x:T11 |- t12 ∈ T12
+                      Gamma , x:T11 ⊢ t12 ∈ T12
                      ----------------------------                       (T_Abs)
-                     Gamma |- λx:T11.t12 ∈ T11->T12
+                     Gamma ⊢ λx:T11.t12 ∈ T11->T12
 
-                        Gamma |- t1 ∈ T11->T12
-                          Gamma |- t2 ∈ T11
+                        Gamma ⊢ t1 ∈ T11->T12
+                          Gamma ⊢ t2 ∈ T11
                         ----------------------                          (T_App)
-                         Gamma |- t1 t2 ∈ T12
+                         Gamma ⊢ t1 t2 ∈ T12
 
                          --------------------                          (T_True)
-                         Gamma |- true ∈ Bool
+                         Gamma ⊢ true ∈ Bool
 
                         ---------------------                         (T_False)
-                        Gamma |- false ∈ Bool
+                        Gamma ⊢ false ∈ Bool
 
-       Gamma |- t1 ∈ Bool    Gamma |- t2 ∈ T    Gamma |- t3 ∈ T
+       Gamma ⊢ t1 ∈ Bool    Gamma ⊢ t2 ∈ T    Gamma ⊢ t3 ∈ T
        --------------------------------------------------------          (T_If)
-                  Gamma |- if t1 then t2 else t3 ∈ T
+                  Gamma ⊢ if t1 then t2 else t3 ∈ T
 
 
-    We can read the three-place relation [Gamma |- t ∈ T] as: 
+    We can read the three-place relation [Gamma ⊢ t ∈ T] as: 
     "to the term [t] we can assign the type [T] using as types for
     the free variables of [t] the ones specified in the context 
     [Gamma]." *)
 
-Reserved Notation "Gamma '|-' t '∈' T" (at level 40).
+Reserved Notation "Gamma '⊢' t '∈' T" (at level 40).
     
 Inductive has_type : context -> tm -> ty -> Prop :=
   | T_Var : forall Gamma x T,
       Gamma x = Some T ->
-      Gamma |- tvar x ∈ T
+      Gamma ⊢ tvar x ∈ T
   | T_Abs : forall Gamma x T11 T12 t12,
-      extend Gamma x T11 |- t12 ∈ T12 -> 
-      Gamma |- tabs x T11 t12 ∈ TArrow T11 T12
+      extend Gamma x T11 ⊢ t12 ∈ T12 -> 
+      Gamma ⊢ tabs x T11 t12 ∈ TArrow T11 T12
   | T_App : forall T11 T12 Gamma t1 t2,
-      Gamma |- t1 ∈ TArrow T11 T12 -> 
-      Gamma |- t2 ∈ T11 -> 
-      Gamma |- tapp t1 t2 ∈ T12
+      Gamma ⊢ t1 ∈ TArrow T11 T12 -> 
+      Gamma ⊢ t2 ∈ T11 -> 
+      Gamma ⊢ tapp t1 t2 ∈ T12
   | T_True : forall Gamma,
-       Gamma |- ttrue ∈ TBool
+       Gamma ⊢ ttrue ∈ TBool
   | T_False : forall Gamma,
-       Gamma |- tfalse ∈ TBool
+       Gamma ⊢ tfalse ∈ TBool
   | T_If : forall t1 t2 t3 T Gamma,
-       Gamma |- t1 ∈ TBool ->
-       Gamma |- t2 ∈ T ->
-       Gamma |- t3 ∈ T ->
-       Gamma |- tif t1 t2 t3 ∈ T
+       Gamma ⊢ t1 ∈ TBool ->
+       Gamma ⊢ t2 ∈ T ->
+       Gamma ⊢ t3 ∈ T ->
+       Gamma ⊢ tif t1 t2 t3 ∈ T
 
-where "Gamma '|-' t '∈' T" := (has_type Gamma t T).
+where "Gamma '⊢' t '∈' T" := (has_type Gamma t T).
 
 Tactic Notation "has_type_cases" tactic(first) ident(c) :=
   first;
@@ -740,23 +740,23 @@ Hint Constructors has_type.
 (** *** Examples *)
 
 Example typing_example_1 :
-  empty |- tabs x TBool (tvar x) ∈ TArrow TBool TBool.
+  empty ⊢ tabs x TBool (tvar x) ∈ TArrow TBool TBool.
 Proof. apply T_Abs. apply T_Var. reflexivity.  Qed.
 
 (** Note that since we added the [has_type] constructors to the hints
     database, auto can actually solve this one immediately. *)
 
 Example typing_example_1' :
-  empty |- tabs x TBool (tvar x) ∈ TArrow TBool TBool.
+  empty ⊢ tabs x TBool (tvar x) ∈ TArrow TBool TBool.
 Proof. auto.  Qed.
 
 (** Another example:
-     empty |- λx:A. λy:A->A. y (y x)) 
+     empty ⊢ λx:A. λy:A->A. y (y x)) 
            ∈ A -> (A->A) -> A.
 *)
 
 Example typing_example_2 :
-  empty |-
+  empty ⊢
     (tabs x TBool
        (tabs y (TArrow TBool TBool)
           (tapp (tvar y) (tapp (tvar y) (tvar x))))) ∈
@@ -773,7 +773,7 @@ Qed.
     [eapply]. *)
 
 Example typing_example_2_full :
-  empty |-
+  empty ⊢
     (tabs x TBool
        (tabs y (TArrow TBool TBool)
           (tapp (tvar y) (tapp (tvar y) (tvar x))))) ∈
@@ -784,14 +784,14 @@ Proof. repeat econstructor. Qed.
 (** **** Exercise: 2 stars (typing_example_3) *)
 (** Formally prove the following typing derivation holds: *)
 (** 
-   empty |- λx:Bool->B. λy:Bool->Bool. λz:Bool.
+   empty ⊢ λx:Bool->B. λy:Bool->Bool. λz:Bool.
                y (x z) 
          ∈ T.
 *)
 
 Example typing_example_3 :
   exists T, 
-    empty |-
+    empty ⊢
       (tabs x (TArrow TBool TBool)
          (tabs y (TArrow TBool TBool)
             (tabs z TBool
@@ -809,12 +809,12 @@ Qed.
     formally check that there is no typing derivation assigning a type
     to the term [λx:Bool. λy:Bool, x y] -- i.e.,
     ~ exists T,
-        empty |- λx:Bool. λy:Bool, x y : T.
+        empty ⊢ λx:Bool. λy:Bool, x y : T.
 *)
 
 Example typing_nonexample_1 :
   ~ exists T,
-      empty |- 
+      empty ⊢ 
         (tabs x TBool
             (tabs y TBool
                (tapp (tvar x) (tvar y)))) ∈
@@ -834,12 +834,12 @@ Proof.
 (** **** Exercise: 3 stars, optional (typing_nonexample_3) *)
 (** Another nonexample:
     ~ (exists S, exists T,
-          empty |- λx:S. x x : T).
+          empty ⊢ λx:S. x x : T).
 *)
 
 Example typing_nonexample_3 :
   ~ (exists S, exists T,
-        empty |- 
+        empty ⊢ 
           (tabs x S
              (tapp (tvar x) (tvar x))) ∈
           T).

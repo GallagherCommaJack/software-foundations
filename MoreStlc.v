@@ -1,7 +1,6 @@
 (** * MoreStlc: More on the Simply Typed Lambda-Calculus *)
 
 Require Export Stlc. 
-Require Export LibTactics.
 
 (* ###################################################################### *)
 (** * Simple Extensions to STLC *)
@@ -1160,6 +1159,7 @@ Inductive step : tm -> tm -> Prop :=
        value vl  ->
        (tlcase (tcons v1 vl) t2 x1 x2 t3) ==> (subst x2 vl (subst x1 v1 t3))
   (* fix *)
+
   | ST_Fix1 : forall t t', t ==> t' -> tfix t ==> tfix t'
   | ST_FixAbs : forall xf T t, tfix (tabs xf T t) ==> [xf := tfix (tabs xf T t)] t
 where "t1 '==>' t2" := (step t1 t2).
@@ -1196,84 +1196,84 @@ Definition context := partial_map ty.
 (** Next we define the typing rules.  These are nearly direct
     transcriptions of the inference rules shown above. *)
 
-Reserved Notation "Gamma '|-' t '∈' T" (at level 40).
+Reserved Notation "Gamma '⊢' t '∈' T" (at level 40).
 
 Inductive has_type : context -> tm -> ty -> Prop :=
   (* Typing rules for proper terms *)
   | T_Var : forall Gamma x T,
       Gamma x = Some T ->
-      Gamma |- (tvar x) ∈ T
+      Gamma ⊢ (tvar x) ∈ T
   | T_Abs : forall Gamma x T11 T12 t12,
-      (extend Gamma x T11) |- t12 ∈ T12 -> 
-      Gamma |- (tabs x T11 t12) ∈ (TArrow T11 T12)
+      (extend Gamma x T11) ⊢ t12 ∈ T12 -> 
+      Gamma ⊢ (tabs x T11 t12) ∈ (TArrow T11 T12)
   | T_App : forall T1 T2 Gamma t1 t2,
-      Gamma |- t1 ∈ (TArrow T1 T2) -> 
-      Gamma |- t2 ∈ T1 -> 
-      Gamma |- (tapp t1 t2) ∈ T2
+      Gamma ⊢ t1 ∈ (TArrow T1 T2) -> 
+      Gamma ⊢ t2 ∈ T1 -> 
+      Gamma ⊢ (tapp t1 t2) ∈ T2
   (* nats *)
   | T_Nat : forall Gamma n1,
-      Gamma |- (tnat n1) ∈ TNat
+      Gamma ⊢ (tnat n1) ∈ TNat
   | T_Succ : forall Gamma t1,
-      Gamma |- t1 ∈ TNat ->
-      Gamma |- (tsucc t1) ∈ TNat
+      Gamma ⊢ t1 ∈ TNat ->
+      Gamma ⊢ (tsucc t1) ∈ TNat
   | T_Pred : forall Gamma t1,
-      Gamma |- t1 ∈ TNat ->
-      Gamma |- (tpred t1) ∈ TNat
+      Gamma ⊢ t1 ∈ TNat ->
+      Gamma ⊢ (tpred t1) ∈ TNat
   | T_Mult : forall Gamma t1 t2,
-      Gamma |- t1 ∈ TNat ->
-      Gamma |- t2 ∈ TNat ->
-      Gamma |- (tmult t1 t2) ∈ TNat
+      Gamma ⊢ t1 ∈ TNat ->
+      Gamma ⊢ t2 ∈ TNat ->
+      Gamma ⊢ (tmult t1 t2) ∈ TNat
   | T_If0 : forall Gamma t1 t2 t3 T1,
-      Gamma |- t1 ∈ TNat ->
-      Gamma |- t2 ∈ T1 ->
-      Gamma |- t3 ∈ T1 ->
-      Gamma |- (tif0 t1 t2 t3) ∈ T1
+      Gamma ⊢ t1 ∈ TNat ->
+      Gamma ⊢ t2 ∈ T1 ->
+      Gamma ⊢ t3 ∈ T1 ->
+      Gamma ⊢ (tif0 t1 t2 t3) ∈ T1
   (* pairs *)
   | T_Pair : forall Gamma t1 t2 T1 T2,
-      Gamma |- t1 ∈ T1 ->
-      Gamma |- t2 ∈ T2 ->
-      Gamma |- (tpair t1 t2) ∈ (TProd T1 T2)
+      Gamma ⊢ t1 ∈ T1 ->
+      Gamma ⊢ t2 ∈ T2 ->
+      Gamma ⊢ (tpair t1 t2) ∈ (TProd T1 T2)
   | T_Fst : forall Gamma t T1 T2,
-      Gamma |- t ∈ (TProd T1 T2) ->
-      Gamma |- (tfst t) ∈ T1
+      Gamma ⊢ t ∈ (TProd T1 T2) ->
+      Gamma ⊢ (tfst t) ∈ T1
   | T_Snd : forall Gamma t T1 T2,
-      Gamma |- t ∈ (TProd T1 T2) ->
-      Gamma |- (tsnd t) ∈ T2
+      Gamma ⊢ t ∈ (TProd T1 T2) ->
+      Gamma ⊢ (tsnd t) ∈ T2
   (* unit *)
   | T_Unit : forall Gamma,
-      Gamma |- tunit ∈ TUnit
+      Gamma ⊢ tunit ∈ TUnit
   (* let *)
   | T_Let : forall Gamma x v Tx T t,
-              Gamma |- v ∈ Tx -> (extend Gamma x Tx) |- t ∈ T ->
-              Gamma |- tlet x v t ∈ T
+              Gamma ⊢ v ∈ Tx -> (extend Gamma x Tx) ⊢ t ∈ T ->
+              Gamma ⊢ tlet x v t ∈ T
   (* sums *)
   | T_Inl : forall Gamma t1 T1 T2,
-      Gamma |- t1 ∈ T1 ->
-      Gamma |- (tinl T2 t1) ∈ (TSum T1 T2)
+      Gamma ⊢ t1 ∈ T1 ->
+      Gamma ⊢ (tinl T2 t1) ∈ (TSum T1 T2)
   | T_Inr : forall Gamma t2 T1 T2,
-      Gamma |- t2 ∈ T2 ->
-      Gamma |- (tinr T1 t2) ∈ (TSum T1 T2)
+      Gamma ⊢ t2 ∈ T2 ->
+      Gamma ⊢ (tinr T1 t2) ∈ (TSum T1 T2)
   | T_Case : forall Gamma t0 x1 T1 t1 x2 T2 t2 T,
-      Gamma |- t0 ∈ (TSum T1 T2) -> 
-      (extend Gamma x1 T1) |- t1 ∈ T ->
-      (extend Gamma x2 T2) |- t2 ∈ T -> 
-      Gamma |- (tcase t0 x1 t1 x2 t2) ∈ T
+      Gamma ⊢ t0 ∈ (TSum T1 T2) -> 
+      (extend Gamma x1 T1) ⊢ t1 ∈ T ->
+      (extend Gamma x2 T2) ⊢ t2 ∈ T -> 
+      Gamma ⊢ (tcase t0 x1 t1 x2 t2) ∈ T
   (* lists *)
   | T_Nil : forall Gamma T,
-      Gamma |- (tnil T) ∈ (TList T)
+      Gamma ⊢ (tnil T) ∈ (TList T)
   | T_Cons : forall Gamma t1 t2 T1,
-      Gamma |- t1 ∈ T1 ->
-      Gamma |- t2 ∈ (TList T1) ->
-      Gamma |- (tcons t1 t2) ∈ (TList T1)
+      Gamma ⊢ t1 ∈ T1 ->
+      Gamma ⊢ t2 ∈ (TList T1) ->
+      Gamma ⊢ (tcons t1 t2) ∈ (TList T1)
   | T_Lcase : forall Gamma t1 T1 t2 x1 x2 t3 T2,
-      Gamma |- t1 ∈ (TList T1) ->
-      Gamma |- t2 ∈ T2 ->
-      (extend (extend Gamma x2 (TList T1)) x1 T1) |- t3 ∈ T2 ->
-      Gamma |- (tlcase t1 t2 x1 x2 t3) ∈ T2
+      Gamma ⊢ t1 ∈ (TList T1) ->
+      Gamma ⊢ t2 ∈ T2 ->
+      (extend (extend Gamma x2 (TList T1)) x1 T1) ⊢ t3 ∈ T2 ->
+      Gamma ⊢ (tlcase t1 t2 x1 x2 t3) ∈ T2
   (* fix *)
-  | T_Fix : forall Gamma t T, Gamma |- t ∈ (TArrow T T) -> Gamma |- tfix t ∈ T
+  | T_Fix : forall Gamma t T, Gamma ⊢ t ∈ (TArrow T T) -> Gamma ⊢ tfix t ∈ T
 
-where "Gamma '|-' t '∈' T" := (has_type Gamma t T).
+where "Gamma '⊢' t '∈' T" := (has_type Gamma t T).
 
 Hint Constructors has_type.
 
@@ -1335,7 +1335,7 @@ Notation eo := (Id 18).
     [auto].
 
     The following [Hint] declarations say that, whenever [auto]
-    arrives at a goal of the form [(Gamma |- (tapp e1 e1) ∈ T)], it
+    arrives at a goal of the form [(Gamma ⊢ (tapp e1 e1) ∈ T)], it
     should consider [eapply T_App], leaving an existential variable
     for the middle type T1, and similar for [lcase]. That variable
     will then be filled in during the search for type derivations for
@@ -1372,7 +1372,7 @@ Definition test :=
 
 
 Example typechecks :
-  (@empty ty) |- test ∈ TNat.
+  (@empty ty) ⊢ test ∈ TNat.
 Proof.
   unfold test.
   (* This typing derivation is quite deep, so we need to increase the
@@ -1403,7 +1403,7 @@ Definition test :=
         (tnat 7))).
 
 Example typechecks :
-  (@empty ty) |- test ∈ TNat.
+  (@empty ty) ⊢ test ∈ TNat.
 Proof. unfold test. eauto 15. Qed.
 
 Example reduces :
@@ -1424,7 +1424,7 @@ Definition test :=
     (tsucc (tvar x)).
 
 Example typechecks :
-  (@empty ty) |- test ∈ TNat.
+  (@empty ty) ⊢ test ∈ TNat.
 Proof. unfold test. eauto 15. Qed.
 
 Example reduces :
@@ -1447,7 +1447,7 @@ Definition test :=
     y (tvar y).
 
 Example typechecks :
-  (@empty ty) |- test ∈ TNat.
+  (@empty ty) ⊢ test ∈ TNat.
 Proof. unfold test. eauto 15. Qed.
 
 Example reduces :
@@ -1477,7 +1477,7 @@ Definition test :=
       (tapp (tvar processSum) (tinr TNat (tnat 5)))).
 
 Example typechecks :
-  (@empty ty) |- test ∈ (TProd TNat TNat).
+  (@empty ty) ⊢ test ∈ (TProd TNat TNat).
 Proof. unfold test. eauto 15. Qed.
 
 Example reduces :
@@ -1503,7 +1503,7 @@ Definition test :=
        x y (tmult (tvar x) (tvar x))).
 
 Example typechecks :
-  (@empty ty) |- test ∈ TNat.
+  (@empty ty) ⊢ test ∈ TNat.
 Proof. unfold test. eauto 20. Qed.
 
 Example reduces :
@@ -1535,7 +1535,7 @@ Definition fact :=
     rules wrong!) *)
 
 Example fact_typechecks :
-  (@empty ty) |- fact ∈ (TArrow TNat TNat).
+  (@empty ty) ⊢ fact ∈ (TArrow TNat TNat).
 Proof. unfold fact. auto 10. 
 Qed.
 
@@ -1551,7 +1551,7 @@ Definition halve :=
            (tsucc (tapp (tvar f) (tpred (tpred (tvar a))))))))).
 
 Example halve_typechecks :
-  (@empty ty) |- halve ∈ (TArrow TNat TNat).
+  (@empty ty) ⊢ halve ∈ (TArrow TNat TNat).
 Proof. unfold halve. auto 10. Qed.
 
 Example halve_example:
@@ -1581,7 +1581,7 @@ Definition map :=
                          (tapp (tvar f) (tvar l))))))).
 
 Example map_typechecks :
-  empty |- map ∈ 
+  empty ⊢ map ∈ 
     (TArrow (TArrow TNat TNat)
       (TArrow (TList TNat) 
         (TList TNat))).
@@ -1619,7 +1619,7 @@ Definition equal :=
                       (tpred (tvar n)))))))).
 
 Example equal_typechecks :
-  (@empty ty) |- equal ∈ (TArrow TNat (TArrow TNat TNat)).
+  (@empty ty) ⊢ equal ∈ (TArrow TNat (TArrow TNat TNat)).
 Proof. unfold equal. auto 10. 
 Qed.
 
@@ -1666,7 +1666,7 @@ Definition eotest :=
     (tapp (tvar even) (tnat 4))))).
 
 Example eotest_typechecks :
-  (@empty ty) |- eotest ∈ (TProd TNat TNat).
+  (@empty ty) ⊢ eotest ∈ (TProd TNat TNat).
 Proof. unfold eotest. eauto 30. 
 Qed.
 
@@ -1688,186 +1688,27 @@ End Examples.
 (* ###################################################################### *)
 (** *** Progress *)
 
+Ltac destr_vals :=
+  repeat match goal with
+           | [ p : value _ |- _ ] => inverts p
+         end.
+
+Ltac empty_no_eq := match goal with [p : empty _ = _ |- _] => inverts p end.
+
 Theorem progress : forall t T, 
-     empty |- t ∈ T ->
-     value t \/ exists t', t ==> t'. 
+     empty ⊢ t ∈ T ->
+     value t \/ exists t', t ==> t'.
 Proof with eauto.
-  (* Theorem: Suppose empty |- t : T.  Then either
-       1. t is a value, or
-       2. t ==> t' for some t'.
-     Proof: By induction on the given typing derivation. *)
-  intros t T Ht.
-  remember (@empty ty) as Gamma.
-  generalize dependent HeqGamma.
-  has_type_cases (induction Ht) Case; intros HeqGamma; subst.
-  Case "T_Var".
-    (* The final rule in the given typing derivation cannot be [T_Var],
-       since it can never be the case that [empty |- x : T] (since the
-       context is empty). *)
-    inversion H.
-  Case "T_Abs".
-    (* If the [T_Abs] rule was the last used, then [t = tabs x T11 t12],
-       which is a value. *)
-    left...
-  Case "T_App".
-    (* If the last rule applied was T_App, then [t = t1 t2], and we know 
-       from the form of the rule that
-         [empty |- t1 : T1 -> T2]
-         [empty |- t2 : T1]
-       By the induction hypothesis, each of t1 and t2 either is a value 
-       or can take a step. *)
-    right.
-    destruct IHHt1; subst...
-    SCase "t1 is a value".
-      destruct IHHt2; subst...
-      SSCase "t2 is a value".
-      (* If both [t1] and [t2] are values, then we know that 
-         [t1 = tabs x T11 t12], since abstractions are the only values
-         that can have an arrow type.  But 
-         [(tabs x T11 t12) t2 ==> [x:=t2]t12] by [ST_AppAbs]. *)
-        inversion H; subst; try (solve by inversion).
-        exists (subst x t2 t12)...
-      SSCase "t2 steps".
-        (* If [t1] is a value and [t2 ==> t2'], then [t1 t2 ==> t1 t2'] 
-           by [ST_App2]. *)
-        inversion H0 as [t2' Hstp]. exists (tapp t1 t2')...
-    SCase "t1 steps".
-      (* Finally, If [t1 ==> t1'], then [t1 t2 ==> t1' t2] by [ST_App1]. *)
-      inversion H as [t1' Hstp]. exists (tapp t1' t2)...
-  Case "T_Nat".
-    left...
-  Case "T_Succ".
-    right.
-    destruct IHHt...
-    SCase "t1 is a value".
-      inversion H; subst; try solve by inversion.
-      exists (tnat (S n1))...
-    SCase "t1 steps".
-      inversion H as [t1' Hstp].
-      exists (tsucc t1')...
-  Case "T_Pred".
-    right.
-    destruct IHHt...
-    SCase "t1 is a value".
-      inversion H; subst; try solve by inversion.
-      exists (tnat (pred n1))...
-    SCase "t1 steps".
-      inversion H as [t1' Hstp].
-      exists (tpred t1')...
-  Case "T_Mult".
-    right.
-    destruct IHHt1...
-    SCase "t1 is a value".
-      destruct IHHt2...
-      SSCase "t2 is a value".
-        inversion H; subst; try solve by inversion.
-        inversion H0; subst; try solve by inversion.
-        exists (tnat (mult n1 n0))...
-      SSCase "t2 steps".
-        inversion H0 as [t2' Hstp].
-        exists (tmult t1 t2')...
-    SCase "t1 steps".
-      inversion H as [t1' Hstp].
-      exists (tmult t1' t2)...
-  Case "T_If0".
-    right.
-    destruct IHHt1...
-    SCase "t1 is a value".
-      inversion H; subst; try solve by inversion.
-      destruct n1 as [|n1'].
-      SSCase "n1=0".
-        exists t2...
-      SSCase "n1<>0".
-        exists t3...
-    SCase "t1 steps".
-      inversion H as [t1' H0].
-      exists (tif0 t1' t2 t3)...
-  Case "T_Pair".
-    destruct IHHt1...
-    SCase "t1 is a value".
-      destruct IHHt2...
-      SSCase "t2 steps".
-        right.  inversion H0 as [t2' Hstp].
-        exists (tpair t1 t2')...
-    SCase "t1 steps".
-      right. inversion H as [t1' Hstp].
-      exists (tpair t1' t2)...
-  Case "T_Fst".
-    right.
-    destruct IHHt...
-    SCase "t1 is a value".
-      inversion H; subst; try solve by inversion.
-      exists v1...
-    SCase "t1 steps".
-      inversion H as [t1' Hstp].
-      exists (tfst t1')...
-  Case "T_Snd".
-    right.
-    destruct IHHt...
-    SCase "t1 is a value".
-      inversion H; subst; try solve by inversion.
-      exists v2...
-    SCase "t1 steps".
-      inversion H as [t1' Hstp].
-      exists (tsnd t1')...
-  Case "T_Unit".
-    left...
-  Case "T_Let". right.
-    clear IHHt2. apply (fun f => f eq_refl) in IHHt1.
-    destruct IHHt1.
-      exists ([x := v] t)...
-      inverts H. exists (tlet x x0 t)...
-  Case "T_Inl".
-    destruct IHHt... 
-    SCase "t1 steps". 
-      right. inversion H as [t1' Hstp]... 
-      (* exists (tinl _ t1')... *)
-  Case "T_Inr".
-    destruct IHHt... 
-    SCase "t1 steps". 
-      right. inversion H as [t1' Hstp]... 
-      (* exists (tinr _ t1')... *)
-  Case "T_Case".
-    right. 
-    destruct IHHt1...
-    SCase "t0 is a value".
-      inversion H; subst; try solve by inversion.
-      SSCase "t0 is inl".
-        exists ([x1:=v]t1)...  
-      SSCase "t0 is inr".        
-        exists ([x2:=v]t2)...
-    SCase "t0 steps".
-      inversion H as [t0' Hstp]. 
-      exists (tcase t0' x1 t1 x2 t2)...
-  Case "T_Nil".
-    left...
-  Case "T_Cons".
-    destruct IHHt1...
-    SCase "head is a value".
-      destruct IHHt2...
-      SSCase "tail steps".
-        right. inversion H0 as [t2' Hstp].
-        exists (tcons t1 t2')...
-    SCase "head steps".
-      right. inversion H as [t1' Hstp].
-      exists (tcons t1' t2)...
-  Case "T_Lcase".
-    right.
-    destruct IHHt1... 
-    SCase "t1 is a value".
-      inversion H; subst; try solve by inversion.
-      SSCase "t1=tnil".
-        exists t2...
-      SSCase "t1=tcons v1 vl".
-        exists ([x2:=vl]([x1:=v1]t3))...
-    SCase "t1 steps".
-      inversion H as [t1' Hstp].
-      exists (tlcase t1' t2 x1 x2 t3)...
-(* fix *)
-  Case "T_Fix".
-    apply (fun f => f eq_refl) in IHHt. right. destruct IHHt.
-      inverts Ht; inverts H. exists ([x := tfix (tabs x T t12)] t12)...
-      inverts H. exists (tfix x)...
+  introv Ht; remember (@empty ty) as Gamma; has_type_cases (induction Ht) Case;
+  subst; eauto; try empty_no_eq;
+  repeat match goal with [ p : empty = empty -> _ |- _ ] =>
+                         apply (fun f => f eq_refl) in p end;
+  destr_sums; destr_prods; eauto;
+  do 2 match goal with
+         | [ |- context[tif0 (tnat ?n) _ _]] => destruct n; eauto
+         | [ p1 : empty ⊢ ?t ∈ ?T, p2 : value ?t |- _ ] => 
+           inverts p1; inverts p2; eauto
+       end.
 Qed.
 
 (* ###################################################################### *)
@@ -1972,9 +1813,9 @@ Inductive appears_free_in : id -> tm -> Prop :=
 Hint Constructors appears_free_in.
 
 Lemma context_invariance : forall Gamma Gamma' t S,
-     Gamma |- t ∈ S  ->
+     Gamma ⊢ t ∈ S  ->
      (forall x, appears_free_in x t -> Gamma x = Gamma' x)  ->
-     Gamma' |- t ∈ S.
+     Gamma' ⊢ t ∈ S.
 Proof with eauto.
   intros. generalize dependent Gamma'.
   has_type_cases (induction H) Case; 
@@ -2016,7 +1857,7 @@ Qed.
 
 Lemma free_in_context : forall x t T Gamma,
    appears_free_in x t ->
-   Gamma |- t ∈ T ->
+   Gamma ⊢ t ∈ T ->
    exists T', Gamma x = Some T'.
 Proof with eauto.
   intros x t T Gamma Hafi Htyp.
@@ -2056,12 +1897,12 @@ Proof. introv neq. unfold extend.
 
 
 Lemma substitution_preserves_typing : forall Gamma x U v t S,
-     (extend Gamma x U) |- t ∈ S  ->
-     empty |- v ∈ U   ->
-     Gamma |- ([x:=v]t) ∈ S.
+     (extend Gamma x U) ⊢ t ∈ S  ->
+     empty ⊢ v ∈ U   ->
+     Gamma ⊢ ([x:=v]t) ∈ S.
 Proof with eauto.
-  (* Theorem: If Gamma,x:U |- t : S and empty |- v : U, then 
-     Gamma |- [x:=v]t : S. *)
+  (* Theorem: If Gamma,x:U ⊢ t : S and empty ⊢ v : U, then 
+     Gamma ⊢ [x:=v]t : S. *)
   intros Gamma x U v t S Htypt Htypv. 
   generalize dependent Gamma. generalize dependent S.
   (* Proof: By induction on the term t.  Most cases follow directly
@@ -2073,17 +1914,17 @@ Proof with eauto.
   Case "tvar".
     simpl. rename i into y.
     (* If t = y, we know that
-         [empty |- v : U] and
-         [Gamma,x:U |- y : S]
+         [empty ⊢ v : U] and
+         [Gamma,x:U ⊢ y : S]
        and, by inversion, [extend Gamma x U y = Some S].  We want to
-       show that [Gamma |- [x:=v]y : S].
+       show that [Gamma ⊢ [x:=v]y : S].
 
        There are two cases to consider: either [x=y] or [x<>y]. *)
     destruct (eq_id_dec x y).
     SCase "x=y".
     (* If [x = y], then we know that [U = S], and that [[x:=v]y = v].
-       So what we really must show is that if [empty |- v : U] then
-       [Gamma |- v : U].  We have already proven a more general version
+       So what we really must show is that if [empty ⊢ v : U] then
+       [Gamma ⊢ v : U].  We have already proven a more general version
        of this theorem, called context invariance. *)
       subst.
       unfold extend in H1. rewrite eq_id in H1. 
@@ -2094,22 +1935,22 @@ Proof with eauto.
       inversion HT'.
     SCase "x<>y".
     (* If [x <> y], then [Gamma y = Some S] and the substitution has no
-       effect.  We can show that [Gamma |- y : S] by [T_Var]. *)
+       effect.  We can show that [Gamma ⊢ y : S] by [T_Var]. *)
       apply T_Var... unfold extend in H1. rewrite neq_id in H1...
   Case "tabs".
     rename i into y. rename t into T11.
     (* If [t = tabs y T11 t0], then we know that
-         [Gamma,x:U |- tabs y T11 t0 : T11->T12]
-         [Gamma,x:U,y:T11 |- t0 : T12]
-         [empty |- v : U]
+         [Gamma,x:U ⊢ tabs y T11 t0 : T11->T12]
+         [Gamma,x:U,y:T11 ⊢ t0 : T12]
+         [empty ⊢ v : U]
        As our IH, we know that forall S Gamma, 
-         [Gamma,x:U |- t0 : S -> Gamma |- [x:=v]t0 : S].
+         [Gamma,x:U ⊢ t0 : S -> Gamma ⊢ [x:=v]t0 : S].
     
        We can calculate that 
          [x:=v]t = tabs y T11 (if beq_id x y then t0 else [x:=v]t0)
-       And we must show that [Gamma |- [x:=v]t : T11->T12].  We know
+       And we must show that [Gamma ⊢ [x:=v]t : T11->T12].  We know
        we will do so using [T_Abs], so it remains to be shown that:
-         [Gamma,y:T11 |- if beq_id x y then t0 else [x:=v]t0 : T12]
+         [Gamma,y:T11 ⊢ if beq_id x y then t0 else [x:=v]t0 : T12]
        We consider two cases: [x = y] and [x <> y].
     *)
     apply T_Abs...
@@ -2125,9 +1966,9 @@ Proof with eauto.
       destruct (eq_id_dec y x)...
     SCase "x<>y".
     (* If [x <> y], then the IH and context invariance allow us to show that
-         [Gamma,x:U,y:T11 |- t0 : T12]       =>
-         [Gamma,y:T11,x:U |- t0 : T12]       =>
-         [Gamma,y:T11 |- [x:=v]t0 : T12] *)
+         [Gamma,x:U,y:T11 ⊢ t0 : T12]       =>
+         [Gamma,y:T11,x:U ⊢ t0 : T12]       =>
+         [Gamma,y:T11 ⊢ [x:=v]t0 : T12] *)
       apply IHt. eapply context_invariance...
       intros z Hafi. unfold extend.
       destruct (eq_id_dec y z)...
@@ -2195,12 +2036,12 @@ Qed.
 (** *** Preservation *)
 
 Theorem preservation : forall t t' T,
-     empty |- t ∈ T  ->
+     empty ⊢ t ∈ T  ->
      t ==> t'  ->
-     empty |- t' ∈ T.
+     empty ⊢ t' ∈ T.
 Proof with eauto.
   intros t t' T HT.
-  (* Theorem: If [empty |- t : T] and [t ==> t'], then [empty |- t' : T]. *)
+  (* Theorem: If [empty ⊢ t : T] and [t ==> t'], then [empty ⊢ t' : T]. *)
   remember (@empty ty) as Gamma. generalize dependent HeqGamma.
   generalize dependent t'.
   (* Proof: By induction on the given typing derivation.  Many cases are
@@ -2218,13 +2059,13 @@ Proof with eauto.
            [t1 = tabs x T11 t12]
          and
            [t2 = v2].  
-         We must show that [empty |- [x:=v2]t12 : T2]. 
+         We must show that [empty ⊢ [x:=v2]t12 : T2]. 
          We know by assumption that
-             [empty |- tabs x T11 t12 : T1->T2]
+             [empty ⊢ tabs x T11 t12 : T1->T2]
          and by inversion
-             [x:T1 |- t12 : T2]
+             [x:T1 ⊢ t12 : T2]
          We have already proven that substitution_preserves_typing and 
-             [empty |- v2 : T1]
+             [empty ⊢ v2 : T1]
          by assumption, so we are done. *)
       apply substitution_preserves_typing with T1...
       inversion HT1...
